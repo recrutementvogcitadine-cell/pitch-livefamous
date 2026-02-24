@@ -70,3 +70,38 @@ Quick steps — Vercel:
 Health check endpoint: `GET /api/health` returns `{ ok: true }`.
 
 If you want, I can: add an SSH deploy target in GitHub Actions (you'll need to provide server SSH secrets), or configure a Vercel deployment for you.
+
+## Déploiement direct sur Vercel (guide rapide)
+
+1. Créez un compte Vercel (https://vercel.com) et connectez votre dépôt GitHub `recrutementvogcitadine-cell/pitch-livefamous`.
+
+2. Lors de l'import, Vercel détectera automatiquement Next.js. Dans les paramètres du projet (Settings → Environment Variables), ajoutez les variables d'environnement suivantes :
+
+- **NEXT_PUBLIC_SUPABASE_URL** → valeur de votre Supabase (ex: `https://...supabase.co`) (Preview + Production)
+- **NEXT_PUBLIC_SUPABASE_ANON_KEY** → clé publique (Preview + Production)
+- **SUPABASE_SERVICE_ROLE** → clé service-role (ONLY Production). **NE PAS** commiter cette clé dans le dépôt.
+
+3. (Optionnel en local) Vous pouvez gérer les variables via la CLI Vercel :
+
+```bash
+npm i -g vercel
+vercel login
+# associer le projet local au projet Vercel (une fois connecté)
+vercel link
+# ajouter une variable (exemple pour production)
+vercel env add NEXT_PUBLIC_SUPABASE_URL production
+vercel env add NEXT_PUBLIC_SUPABASE_ANON_KEY production
+vercel env add SUPABASE_SERVICE_ROLE production
+```
+
+4. Déploiement : une fois les variables définies, chaque push sur `main` déclenchera un déploiement automatique par Vercel.
+
+5. Vérifiez l'URL de déploiement fournie par Vercel et testez l'endpoint de santé : `https://<votre-projet>.vercel.app/api/health` (doit retourner `{ "ok": true }`).
+
+Notes de sécurité et bonnes pratiques
+
+- Stockez **SUPABASE_SERVICE_ROLE** uniquement comme secret dans Vercel (Production) et ne l'exposez jamais côté client. Utilisez-la seulement pour opérations serveur (seeding, scripts admin).
+- Pour les previews/PR, utilisez des clefs différentes si possible (ou limitez les droits via RLS).
+- Configurez des contrôles d'accès et des policies RLS sur Supabase avant de déployer en production.
+
+Si vous voulez, je peux automatiser l'ajout des variables via la CLI (vous devrez exécuter `vercel login` sur votre machine et me fournir la confirmation) ou je peux vous fournir un guide pas‑à‑pas avec screenshots pour l'UI Vercel.
