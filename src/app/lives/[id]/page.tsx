@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 
-export default async function Page({ params }: { params: any }) {
+type PageParams = { id?: string } | Promise<{ id?: string }>
+
+export default async function Page({ params }: { params: PageParams }) {
   const resolvedParams = await params
   const id = resolvedParams?.id
   // validate UUID to avoid database errors when id is not a uuid
