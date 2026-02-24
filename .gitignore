@@ -13,3 +13,5 @@ pnpm-debug.log*
 .idea/
 coverage/
 *.local
+.next/
+page_lives_*.html
