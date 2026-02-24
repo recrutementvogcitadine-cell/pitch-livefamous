@@ -1,0 +1,10 @@
+node_modules
+.next
+.vscode
+.env.local
+.env.*.local
+.git
+videos
+*.log
+dist
+build
