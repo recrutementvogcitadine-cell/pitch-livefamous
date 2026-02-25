@@ -13,6 +13,8 @@
     "dependencies": {
         "@supabase/ssr": "^0.8.0",
         "@supabase/supabase-js": "^2.97.0",
+        "agora-rtc-sdk-ng": "^4.9.0",
+        "agora-access-token": "*",
         "next": "16.1.6",
         "react": "19.2.3",
         "react-dom": "19.2.3"
