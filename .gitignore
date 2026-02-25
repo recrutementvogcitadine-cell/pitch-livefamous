@@ -15,3 +15,5 @@ coverage/
 *.local
 .next/
 page_lives_*.html
+.vercel
+.env*.local
