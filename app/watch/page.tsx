@@ -643,7 +643,16 @@ export default function WatchPage() {
                           : "Afficher ma caméra"}
                     </button>
                     <Link href="/agora-test" style={goLiveActionStyle}>
-                      Passer en live caméra
+                      <span style={cameraIconBadgeStyle} aria-hidden="true">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                          <path
+                            d="M4 8.5C4 7.12 5.12 6 6.5 6H13.5C14.88 6 16 7.12 16 8.5V15.5C16 16.88 14.88 18 13.5 18H6.5C5.12 18 4 16.88 4 15.5V8.5Z"
+                            fill="#ef4444"
+                          />
+                          <path d="M16 10.2L20 8V16L16 13.8V10.2Z" fill="#ef4444" />
+                        </svg>
+                      </span>
+                      <span style={goLiveLabelStyle}>Passer en live caméra</span>
                     </Link>
                     <Link href="/auth?mode=creator" style={{ ...actionStyle, background: "rgba(30,41,59,0.9)" }}>
                       Devenir créateur
@@ -759,7 +768,16 @@ export default function WatchPage() {
           {previewError ? <p style={{ margin: 0, color: "#fecaca", fontSize: 12 }}>Erreur caméra: {previewError}</p> : null}
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <Link href="/agora-test" style={goLiveActionStyle}>
-              Passer en live (créateur)
+              <span style={cameraIconBadgeStyle} aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M4 8.5C4 7.12 5.12 6 6.5 6H13.5C14.88 6 16 7.12 16 8.5V15.5C16 16.88 14.88 18 13.5 18H6.5C5.12 18 4 16.88 4 15.5V8.5Z"
+                    fill="#ef4444"
+                  />
+                  <path d="M16 10.2L20 8V16L16 13.8V10.2Z" fill="#ef4444" />
+                </svg>
+              </span>
+              <span style={goLiveLabelStyle}>Passer en live (créateur)</span>
             </Link>
             <Link href="/auth?mode=creator" style={{ ...actionStyle, background: "rgba(30,41,59,0.95)" }}>
               Demander statut créateur
@@ -855,6 +873,23 @@ const goLiveActionStyle: CSSProperties = {
   background: "#f97316",
   border: "1px solid rgba(255,255,255,0.28)",
   boxShadow: "0 8px 18px rgba(249,115,22,0.4)",
+  gap: 8,
+};
+
+const cameraIconBadgeStyle: CSSProperties = {
+  width: 24,
+  height: 24,
+  borderRadius: 999,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  background: "rgba(255,255,255,0.92)",
+  boxShadow: "0 3px 8px rgba(127,29,29,0.25)",
+};
+
+const goLiveLabelStyle: CSSProperties = {
+  lineHeight: 1,
+  fontWeight: 800,
 };
 
 const inlineActionButtonStyle: CSSProperties = {
