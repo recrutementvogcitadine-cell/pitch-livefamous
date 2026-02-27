@@ -30,9 +30,13 @@ export default function SettingsPage() {
   const [error, setError] = useState<string | null>(null);
   const [nextLiveAt, setNextLiveAt] = useState("");
   const [nextLiveAnnouncement, setNextLiveAnnouncement] = useState("");
+  const [creatorWhatsapp, setCreatorWhatsapp] = useState("");
   const [loadingSchedule, setLoadingSchedule] = useState(true);
   const [savingSchedule, setSavingSchedule] = useState(false);
   const [creatorProfileHref, setCreatorProfileHref] = useState<string | null>(null);
+
+  const normalizeWhatsapp = (value: string) => value.replace(/[^\d+]/g, "").trim();
+  const isValidWhatsapp = (value: string) => value.replace(/\D/g, "").length >= 8;
 
   useEffect(() => {
     const loadSchedule = async () => {
@@ -43,13 +47,14 @@ export default function SettingsPage() {
           setLoadingSchedule(false);
           return;
         }
-        const body = (await response.json()) as { creatorId?: string; nextLiveAt?: string | null; announcement?: string };
+        const body = (await response.json()) as { creatorId?: string; nextLiveAt?: string | null; announcement?: string; creatorWhatsapp?: string };
         setNextLiveAt(
           typeof body.nextLiveAt === "string" && body.nextLiveAt
             ? new Date(body.nextLiveAt).toISOString().slice(0, 16)
             : ""
         );
         setNextLiveAnnouncement(typeof body.announcement === "string" ? body.announcement : "");
+        setCreatorWhatsapp(typeof body.creatorWhatsapp === "string" ? body.creatorWhatsapp : "");
         if (typeof body.creatorId === "string" && body.creatorId.trim()) {
           setCreatorProfileHref(`/creator/${encodeURIComponent(body.creatorId)}`);
         }
@@ -126,12 +131,18 @@ export default function SettingsPage() {
     setMessage(null);
     setError(null);
     try {
+      const normalizedWhatsapp = normalizeWhatsapp(creatorWhatsapp);
+      if (!normalizedWhatsapp || !isValidWhatsapp(normalizedWhatsapp)) {
+        throw new Error("WhatsApp obligatoire: entrez un numéro valide avec indicatif (ex: +2250700000000).");
+      }
+
       const response = await fetch("/api/creator/schedule", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           nextLiveAt: nextLiveAt ? new Date(nextLiveAt).toISOString() : null,
           announcement: nextLiveAnnouncement,
+          creatorWhatsapp: normalizedWhatsapp,
         }),
       });
       const body = (await response.json()) as { ok?: boolean; error?: string };
@@ -206,6 +217,18 @@ export default function SettingsPage() {
         </p>
 
         {loadingSchedule ? <p style={{ margin: 0, color: "#64748b" }}>Chargement de votre configuration créateur...</p> : null}
+
+        <label style={{ display: "grid", gap: 6, fontWeight: 600 }}>
+          WhatsApp créateur (obligatoire)
+          <input
+            type="tel"
+            value={creatorWhatsapp}
+            onChange={(e) => setCreatorWhatsapp(e.target.value)}
+            style={inputUiStyle}
+            placeholder="Ex: +2250700000000"
+            disabled={savingSchedule}
+          />
+        </label>
 
         <label style={{ display: "grid", gap: 6, fontWeight: 600 }}>
           Date du prochain live

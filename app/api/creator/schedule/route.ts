@@ -35,6 +35,16 @@ function normalizeText(value: unknown, max = 140) {
   return value.trim().slice(0, max);
 }
 
+function normalizeWhatsapp(value: unknown) {
+  if (typeof value !== "string") return "";
+  return value.replace(/[^\d+]/g, "").trim();
+}
+
+function isValidWhatsapp(value: string) {
+  const digitsOnly = value.replace(/\D/g, "");
+  return digitsOnly.length >= 8;
+}
+
 export async function GET() {
   try {
     const auth = await requireUser();
@@ -55,6 +65,7 @@ export async function GET() {
         creatorId: auth.user.id,
         nextLiveAt: data?.next_live_at ?? null,
         announcement: data?.announcement ?? "",
+        creatorWhatsapp: normalizeWhatsapp((auth.user.user_metadata as Record<string, unknown> | undefined)?.creator_whatsapp),
       },
       { status: 200 }
     );
@@ -68,9 +79,17 @@ export async function PATCH(req: Request) {
     const auth = await requireUser();
     if (!auth.ok) return auth.response;
 
-    const payload = (await req.json()) as { nextLiveAt?: string | null; announcement?: string };
+    const payload = (await req.json()) as { nextLiveAt?: string | null; announcement?: string; creatorWhatsapp?: string };
     const announcement = normalizeText(payload.announcement, 180);
     const nextLiveAt = typeof payload.nextLiveAt === "string" && payload.nextLiveAt.trim() ? payload.nextLiveAt : null;
+    const creatorWhatsapp = normalizeWhatsapp(payload.creatorWhatsapp);
+
+    if (!creatorWhatsapp || !isValidWhatsapp(creatorWhatsapp)) {
+      return NextResponse.json(
+        { error: "Numéro WhatsApp obligatoire et invalide. Ajoutez un numéro valide avec indicatif." },
+        { status: 400 }
+      );
+    }
 
     const { error } = await auth.admin.from("creator_live_schedule").upsert(
       {
@@ -86,7 +105,25 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ ok: true, creatorId: auth.user.id, nextLiveAt, announcement }, { status: 200 });
+    const { data: targetData, error: targetError } = await auth.admin.auth.admin.getUserById(auth.user.id);
+    if (targetError || !targetData.user) {
+      return NextResponse.json({ error: targetError?.message ?? "creator not found" }, { status: 500 });
+    }
+
+    const nextMeta = {
+      ...((targetData.user.user_metadata ?? {}) as Record<string, unknown>),
+      creator_whatsapp: creatorWhatsapp,
+    };
+
+    const { error: updateError } = await auth.admin.auth.admin.updateUserById(auth.user.id, {
+      user_metadata: nextMeta,
+    });
+
+    if (updateError) {
+      return NextResponse.json({ error: updateError.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ ok: true, creatorId: auth.user.id, nextLiveAt, announcement, creatorWhatsapp }, { status: 200 });
   } catch (error: unknown) {
     return NextResponse.json({ error: "creator schedule patch failed", detail: String(error) }, { status: 500 });
   }
