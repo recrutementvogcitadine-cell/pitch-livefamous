@@ -35,6 +35,56 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
   useEffect(() => {
     let active = true;
 
+    const isIOSDevice = () => {
+      if (typeof navigator === "undefined") return false;
+      const ua = navigator.userAgent || "";
+      return /iPhone|iPad|iPod/i.test(ua);
+    };
+
+    const fetchViewerToken = async (liveId: string) => {
+      const tokenResponse = await fetch(`/api/agora/token?channel=${encodeURIComponent(liveId)}&role=subscriber`, {
+        cache: "no-store",
+      });
+      if (!tokenResponse.ok) return null;
+      const body = (await tokenResponse.json()) as { token?: string };
+      return body.token ?? null;
+    };
+
+    const connectWithCodec = async (liveId: string, appId: string, codec: "vp8" | "h264") => {
+      const agoraModule = await import("agora-rtc-sdk-ng");
+      const AgoraRTC = (agoraModule.default ?? agoraModule) as unknown as AgoraSDK;
+      const client = AgoraRTC.createClient({ mode: "rtc", codec });
+      clientRef.current = client;
+
+      client.on("user-published", async (user, mediaType) => {
+        await client.subscribe(user, mediaType);
+
+        if (!active) return;
+
+        if (mediaType === "video" && user.videoTrack && remoteVideoRef.current) {
+          const player = document.createElement("div");
+          player.id = `viewer-${user.uid}`;
+          player.style.width = "100%";
+          player.style.height = "100%";
+          remoteVideoRef.current.innerHTML = "";
+          remoteVideoRef.current.appendChild(player);
+          user.videoTrack.play(player);
+          setStatus("EN DIRECT");
+        }
+
+        if (mediaType === "audio" && user.audioTrack) {
+          user.audioTrack.play();
+        }
+      });
+
+      let token: string | null = null;
+      try {
+        token = await fetchViewerToken(liveId);
+      } catch {}
+
+      await client.join(appId, liveId, token, null);
+    };
+
     const boot = async () => {
       const resolved = await params;
       const liveId = (resolved?.id ?? "").trim();
@@ -54,42 +104,21 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
       }
 
       try {
-        const agoraModule = await import("agora-rtc-sdk-ng");
-        const AgoraRTC = (agoraModule.default ?? agoraModule) as unknown as AgoraSDK;
-        const client = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
-        clientRef.current = client;
+        const primaryCodec: "vp8" | "h264" = isIOSDevice() ? "h264" : "vp8";
+        const fallbackCodec: "vp8" | "h264" = primaryCodec === "h264" ? "vp8" : "h264";
 
-        client.on("user-published", async (user, mediaType) => {
-          await client.subscribe(user, mediaType);
-
-          if (!active) return;
-
-          if (mediaType === "video" && user.videoTrack && remoteVideoRef.current) {
-            const player = document.createElement("div");
-            player.id = `viewer-${user.uid}`;
-            player.style.width = "100%";
-            player.style.height = "100%";
-            remoteVideoRef.current.innerHTML = "";
-            remoteVideoRef.current.appendChild(player);
-            user.videoTrack.play(player);
-            setStatus("EN DIRECT");
-          }
-
-          if (mediaType === "audio" && user.audioTrack) {
-            user.audioTrack.play();
-          }
-        });
-
-        let token: string | null = null;
         try {
-          const tokenResponse = await fetch(`/api/agora/token?channel=${encodeURIComponent(liveId)}&role=subscriber`);
-          if (tokenResponse.ok) {
-            const body = (await tokenResponse.json()) as { token?: string };
-            token = body.token ?? null;
+          await connectWithCodec(liveId, appId, primaryCodec);
+        } catch {
+          const existingClient = clientRef.current;
+          if (existingClient) {
+            try {
+              await existingClient.leave();
+            } catch {}
           }
-        } catch {}
+          await connectWithCodec(liveId, appId, fallbackCodec);
+        }
 
-        await client.join(appId, liveId, token, null);
         if (active) {
           setStatus("Connecté. En attente de la vidéo...");
         }
