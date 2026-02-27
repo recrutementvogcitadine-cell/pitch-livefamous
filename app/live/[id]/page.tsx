@@ -30,6 +30,8 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
   const [status, setStatus] = useState("Connexion au live...");
   const [resolvedId, setResolvedId] = useState("");
   const [hasVideo, setHasVideo] = useState(false);
+  const [liked, setLiked] = useState(false);
+  const [shareMessage, setShareMessage] = useState<string | null>(null);
   const [retryTick, setRetryTick] = useState(0);
   const remoteVideoRef = useRef<HTMLDivElement | null>(null);
   const clientRef = useRef<AgoraClient | null>(null);
@@ -179,6 +181,23 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
     window.open(current, "_blank", "noopener,noreferrer");
   };
 
+  const shareLive = async () => {
+    if (!resolvedId || typeof window === "undefined") return;
+    const url = `${window.location.origin}/live/${encodeURIComponent(resolvedId)}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "Pitch Live", url });
+      } else {
+        await navigator.clipboard.writeText(url);
+      }
+      setShareMessage("Lien partagé ✅");
+      window.setTimeout(() => setShareMessage(null), 1600);
+    } catch {
+      setShareMessage("Partage annulé");
+      window.setTimeout(() => setShareMessage(null), 1200);
+    }
+  };
+
   return (
     <main style={{ minHeight: "100vh", background: "#000", color: "#fff", fontFamily: "system-ui, sans-serif" }}>
       <header style={{ padding: "12px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
@@ -255,6 +274,55 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
         </div>
       </section>
 
+      <aside
+        style={{
+          position: "fixed",
+          right: 12,
+          bottom: 116,
+          zIndex: 12,
+          display: "grid",
+          gap: 10,
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => setLiked((value) => !value)}
+          style={liveActionButtonStyle}
+          aria-label="Like"
+        >
+          {liked ? "❤️" : "🤍"}
+          <span style={liveActionTextStyle}>Like</span>
+        </button>
+        <Link href={resolvedId ? `/lives/${encodeURIComponent(resolvedId)}` : "/lives"} style={liveActionButtonStyle} aria-label="Commentaire">
+          💬
+          <span style={liveActionTextStyle}>Comment</span>
+        </Link>
+        <button type="button" onClick={() => void shareLive()} style={liveActionButtonStyle} aria-label="Partager">
+          ↗️
+          <span style={liveActionTextStyle}>Share</span>
+        </button>
+      </aside>
+
+      {shareMessage ? (
+        <div
+          style={{
+            position: "fixed",
+            left: "50%",
+            bottom: 86,
+            transform: "translateX(-50%)",
+            borderRadius: 999,
+            padding: "8px 12px",
+            background: "rgba(15,23,42,0.84)",
+            color: "#fff",
+            fontSize: 13,
+            fontWeight: 700,
+            zIndex: 13,
+          }}
+        >
+          {shareMessage}
+        </div>
+      ) : null}
+
       {resolvedId ? (
         <p style={{ position: "fixed", left: 12, bottom: 10, margin: 0, fontSize: 11, opacity: 0.65 }}>
           Canal: {resolvedId}
@@ -263,3 +331,26 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
     </main>
   );
 }
+
+const liveActionButtonStyle = {
+  width: 64,
+  height: 64,
+  borderRadius: 999,
+  border: "1px solid rgba(255,255,255,0.25)",
+  background: "rgba(15, 23, 42, 0.7)",
+  color: "#fff",
+  display: "inline-flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 2,
+  textDecoration: "none",
+  fontSize: 18,
+  cursor: "pointer",
+} as const;
+
+const liveActionTextStyle = {
+  fontSize: 11,
+  fontWeight: 700,
+  lineHeight: 1,
+} as const;

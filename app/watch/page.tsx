@@ -47,8 +47,6 @@ export default function WatchPage() {
   const [lives, setLives] = useState<LiveRow[]>([]);
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
-  const [likedByLive, setLikedByLive] = useState<Record<string, boolean>>({});
-  const [shareMessage, setShareMessage] = useState<string | null>(null);
   const [aiPanelByLive, setAiPanelByLive] = useState<Record<string, boolean>>({});
   const [aiInputByLive, setAiInputByLive] = useState<Record<string, string>>({});
   const [aiLoadingByLive, setAiLoadingByLive] = useState<Record<string, boolean>>({});
@@ -272,26 +270,6 @@ export default function WatchPage() {
       setPreviewLiveId(null);
     } finally {
       setPreviewLoading(false);
-    }
-  };
-
-  const toggleLike = (liveId: string) => {
-    setLikedByLive((prev) => ({ ...prev, [liveId]: !prev[liveId] }));
-  };
-
-  const shareLive = async (liveId: string) => {
-    const url = `${window.location.origin}/lives/${liveId}`;
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: "Famous AI Live", url });
-      } else {
-        await navigator.clipboard.writeText(url);
-      }
-      setShareMessage("Lien copié / partagé ✅");
-      window.setTimeout(() => setShareMessage(null), 1800);
-    } catch {
-      setShareMessage("Partage annulé");
-      window.setTimeout(() => setShareMessage(null), 1200);
     }
   };
 
@@ -525,8 +503,7 @@ export default function WatchPage() {
 
       setFollowingByCreator((prev) => ({ ...prev, [creatorId]: Boolean(body.following) }));
     } catch (err: unknown) {
-      setShareMessage(`Erreur follow: ${toDisplayErrorMessage(err)}`);
-      window.setTimeout(() => setShareMessage(null), 2200);
+      setError(`Erreur follow: ${toDisplayErrorMessage(err)}`);
     } finally {
       setFollowLoadingByCreator((prev) => ({ ...prev, [creatorId]: false }));
     }
@@ -631,18 +608,6 @@ export default function WatchPage() {
             onClick={(event) => openLiveByTap(event, live)}
           >
             <aside style={actionRailStyle}>
-              <button onClick={() => toggleLike(live.id)} style={actionBtnStyle} aria-label="Like">
-                {likedByLive[live.id] ? "❤️" : "🤍"}
-                <span style={actionTextStyle}>Like</span>
-              </button>
-              <Link href={`/lives/${live.id}`} style={actionBtnStyle} aria-label="Comment">
-                💬
-                <span style={actionTextStyle}>Comment</span>
-              </Link>
-              <button onClick={() => shareLive(live.id)} style={actionBtnStyle} aria-label="Share">
-                ↗️
-                <span style={actionTextStyle}>Share</span>
-              </button>
               <button onClick={() => void toggleAiPanel(live.id)} style={actionBtnStyle} aria-label="AI Assistant">
                 🤖
                 <span style={actionTextStyle}>AI Live</span>
@@ -814,7 +779,6 @@ export default function WatchPage() {
               </section>
             ) : null}
 
-            {shareMessage ? <div style={shareToastStyle}>{shareMessage}</div> : null}
           </section>
         ))}
 
@@ -1049,19 +1013,6 @@ const actionTextStyle: CSSProperties = {
   fontSize: 11,
   fontWeight: 700,
   lineHeight: 1,
-};
-
-const shareToastStyle: CSSProperties = {
-  position: "absolute",
-  bottom: 80,
-  left: "50%",
-  transform: "translateX(-50%)",
-  background: "rgba(15,23,42,0.8)",
-  color: "#fff",
-  padding: "8px 12px",
-  borderRadius: 999,
-  fontSize: 13,
-  fontWeight: 700,
 };
 
 const followedLivesBannerStyle: CSSProperties = {
