@@ -643,6 +643,7 @@ export default function WatchPage() {
                           : "Afficher ma caméra"}
                     </button>
                     <Link href="/agora-test" style={goLiveActionStyle}>
+                      <span style={newBadgeStyle}>NOUVEAU</span>
                       <span style={cameraIconBadgeStyle} aria-hidden="true">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                           <path
@@ -768,6 +769,7 @@ export default function WatchPage() {
           {previewError ? <p style={{ margin: 0, color: "#fecaca", fontSize: 12 }}>Erreur caméra: {previewError}</p> : null}
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <Link href="/agora-test" style={goLiveActionStyle}>
+              <span style={newBadgeStyle}>NOUVEAU</span>
               <span style={cameraIconBadgeStyle} aria-hidden="true">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                   <path
@@ -890,6 +892,20 @@ const cameraIconBadgeStyle: CSSProperties = {
 const goLiveLabelStyle: CSSProperties = {
   lineHeight: 1,
   fontWeight: 800,
+};
+
+const newBadgeStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: 999,
+  padding: "3px 7px",
+  background: "#ef4444",
+  color: "#fff",
+  fontSize: 10,
+  fontWeight: 900,
+  letterSpacing: 0.3,
+  boxShadow: "0 3px 8px rgba(127,29,29,0.35)",
 };
 
 const inlineActionButtonStyle: CSSProperties = {
