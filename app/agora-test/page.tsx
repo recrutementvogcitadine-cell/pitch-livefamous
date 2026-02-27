@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@supabase/supabase-js";
 
@@ -53,6 +53,7 @@ export default function AgoraTestPage() {
   const remoteVideoRef = useRef<HTMLDivElement | null>(null);
   const clientRef = useRef<AgoraClient | null>(null);
   const localTracksRef = useRef<{ micTrack: AgoraTrack; camTrack: AgoraTrack } | null>(null);
+  const autoJoinTriggeredRef = useRef(false);
 
   function supabaseClient() {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -236,6 +237,26 @@ export default function AgoraTestPage() {
       setStatus('error: ' + String(err));
     }
   }
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const params = new URLSearchParams(window.location.search);
+    const channelFromUrl = params.get("channel")?.trim();
+    const autojoin = (params.get("autojoin") ?? "").trim().toLowerCase();
+
+    const channelInput = document.getElementById("channel") as HTMLInputElement | null;
+    if (channelInput && channelFromUrl && !channelInput.value.trim()) {
+      channelInput.value = channelFromUrl;
+    }
+
+    if (autojoin === "spectator" && !autoJoinTriggeredRef.current) {
+      autoJoinTriggeredRef.current = true;
+      window.setTimeout(() => {
+        void join("spectator");
+      }, 0);
+    }
+  }, []);
 
   return (
     <main style={{padding:24,fontFamily:'system-ui,sans-serif'}}>
