@@ -304,13 +304,6 @@ export default function WatchPage() {
     }
 
     const nextUrl = `/watch?startLiveId=${encodeURIComponent(live.id)}`;
-    const currentPath = window.location.pathname;
-    const currentStartLiveId = new URLSearchParams(window.location.search).get("startLiveId") ?? "";
-
-    if (currentPath === "/watch" && currentStartLiveId === live.id) {
-      return;
-    }
-
     window.location.replace(nextUrl);
   };
 
