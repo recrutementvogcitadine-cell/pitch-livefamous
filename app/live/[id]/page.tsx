@@ -356,7 +356,7 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
         <span style={{ fontSize: 13, opacity: 0.9 }}>{hasVideo ? "EN DIRECT" : "Chargement"}</span>
       </header>
 
-      <section style={{ height: "calc(100vh - 64px)", padding: 12 }}>
+      <section style={{ height: "calc(100vh - 64px - env(safe-area-inset-bottom, 0px))", padding: 12 }}>
         <div
           ref={remoteVideoRef}
           style={{
