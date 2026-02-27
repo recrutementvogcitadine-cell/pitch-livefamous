@@ -6,6 +6,7 @@ import {
   clearStoredAppLogo,
   DEFAULT_APP_LOGO,
   readStoredAppLogo,
+  useAppLogo,
   writeStoredAppLogo,
 } from "../components/app-logo";
 import {
@@ -22,6 +23,7 @@ const MAX_LOGO_SIZE_MB = 3;
 const MAX_LOGO_SIZE_BYTES = MAX_LOGO_SIZE_MB * 1024 * 1024;
 
 export default function SettingsPage() {
+  const currentAppLogo = useAppLogo();
   const [logoSrc, setLogoSrc] = useState(readStoredAppLogo);
   const [promoConfig, setPromoConfig] = useState<PromoConfig>(readPromoConfig);
   const [message, setMessage] = useState<string | null>(null);
@@ -94,6 +96,10 @@ export default function SettingsPage() {
         </Link>
 
         <h1 style={{ margin: 0 }}>Paramètres de l’application</h1>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <img src={currentAppLogo} alt="Logo app" width={38} height={38} style={{ borderRadius: 10, border: "1px solid #bfdbfe", background: "#fff" }} />
+          <span style={{ color: "#1e3a8a", fontWeight: 700, fontSize: 13 }}>Dashboard Paramètres</span>
+        </div>
         <p style={{ margin: 0, color: "#4b5563" }}>
           Personnalisez votre logo d’application. Le nouveau logo s’affiche dans le bouton d’installation.
         </p>

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useAppLogo } from "../../components/app-logo";
 
 type EscalationStatus = "open" | "resolved";
 
@@ -19,6 +20,7 @@ type EscalationRow = {
 };
 
 export default function ModerationPage() {
+  const appLogo = useAppLogo();
   const [status, setStatus] = useState<EscalationStatus>("open");
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -94,6 +96,10 @@ export default function ModerationPage() {
         </Link>
 
         <h1 style={{ margin: 0 }}>Dashboard modération Live IA</h1>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <img src={appLogo} alt="Logo app" width={38} height={38} style={{ borderRadius: 10, border: "1px solid #bfdbfe", background: "#fff" }} />
+          <span style={{ color: "#1e3a8a", fontWeight: 700, fontSize: 13 }}>Dashboard Modération</span>
+        </div>
         <p style={{ margin: 0, color: "#475569" }}>
           Suivi des questions escaladées vers modération humaine.
         </p>

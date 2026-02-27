@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useAppLogo } from "../../components/app-logo";
 
 type AppRole = "super_admin" | "admin" | "agent";
 
@@ -45,6 +46,7 @@ const actionItems = [
 ];
 
 export default function AdminDashboardPage() {
+  const appLogo = useAppLogo();
   const [loadingRoles, setLoadingRoles] = useState(true);
   const [savingUserId, setSavingUserId] = useState<string | null>(null);
   const [roleUsers, setRoleUsers] = useState<RoleUser[]>([]);
@@ -137,6 +139,10 @@ export default function AdminDashboardPage() {
         </div>
 
         <h1 style={{ margin: 0 }}>Tableau de bord administrateur</h1>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <img src={appLogo} alt="Logo app" width={38} height={38} style={{ borderRadius: 10, border: "1px solid #bfdbfe", background: "#fff" }} />
+          <span style={{ color: "#1e3a8a", fontWeight: 700, fontSize: 13 }}>Dashboard Propriétaire</span>
+        </div>
         <p style={{ margin: 0, color: "#475569" }}>
           Interface centrale pour piloter la modération, l&apos;opération live et les contrôles qualité production.
         </p>
