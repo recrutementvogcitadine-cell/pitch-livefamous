@@ -36,6 +36,7 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
   const remoteVideoRef = useRef<HTMLDivElement | null>(null);
   const clientRef = useRef<AgoraClient | null>(null);
   const [isStandaloneIOS, setIsStandaloneIOS] = useState(false);
+  const [safariOnlyMode, setSafariOnlyMode] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -112,7 +113,17 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
       if (!active) return;
       setResolvedId(liveId);
       setHasVideo(false);
-      setIsStandaloneIOS(isIOSDevice() && isStandaloneMode());
+      const standaloneIOS = isIOSDevice() && isStandaloneMode();
+      setIsStandaloneIOS(standaloneIOS);
+      setSafariOnlyMode(standaloneIOS);
+
+      if (standaloneIOS) {
+        setStatus("Sur iPhone, ouvrez ce live dans Safari pour une lecture stable.");
+        window.setTimeout(() => {
+          openInSafari();
+        }, 120);
+        return;
+      }
 
       if (!liveId) {
         setStatus("Live introuvable.");
@@ -177,7 +188,7 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
 
   const openInSafari = () => {
     if (typeof window === "undefined") return;
-    const current = window.location.href;
+    const current = `${window.location.origin}${window.location.pathname}`;
     window.open(current, "_blank", "noopener,noreferrer");
   };
 
@@ -234,22 +245,7 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
             >
               <div style={{ maxWidth: 320 }}>
                 <p style={{ margin: "0 0 10px", fontWeight: 700 }}>{status}</p>
-                <button
-                  type="button"
-                  onClick={() => setRetryTick((value) => value + 1)}
-                  style={{
-                    border: "1px solid rgba(255,255,255,0.35)",
-                    borderRadius: 999,
-                    padding: "9px 14px",
-                    background: "rgba(37,99,235,0.85)",
-                    color: "#fff",
-                    fontWeight: 700,
-                    cursor: "pointer",
-                  }}
-                >
-                  Réessayer
-                </button>
-                {isStandaloneIOS ? (
+                {safariOnlyMode ? (
                   <div style={{ marginTop: 10 }}>
                     <button
                       type="button"
@@ -267,7 +263,23 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
                       Ouvrir dans Safari
                     </button>
                   </div>
-                ) : null}
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setRetryTick((value) => value + 1)}
+                    style={{
+                      border: "1px solid rgba(255,255,255,0.35)",
+                      borderRadius: 999,
+                      padding: "9px 14px",
+                      background: "rgba(37,99,235,0.85)",
+                      color: "#fff",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Réessayer
+                  </button>
+                )}
               </div>
             </div>
           ) : null}
@@ -323,11 +335,6 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
         </div>
       ) : null}
 
-      {resolvedId ? (
-        <p style={{ position: "fixed", left: 12, bottom: 10, margin: 0, fontSize: 11, opacity: 0.65 }}>
-          Canal: {resolvedId}
-        </p>
-      ) : null}
     </main>
   );
 }
