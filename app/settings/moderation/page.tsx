@@ -26,6 +26,7 @@ export default function ModerationPage() {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [rows, setRows] = useState<EscalationRow[]>([]);
+  const [lastRefreshAt, setLastRefreshAt] = useState<Date | null>(null);
 
   const title = useMemo(
     () => (status === "open" ? "Escalades ouvertes" : "Escalades résolues"),
@@ -44,6 +45,7 @@ export default function ModerationPage() {
       }
 
       setRows(Array.isArray(body.escalations) ? body.escalations : []);
+      setLastRefreshAt(new Date());
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : String(err));
       setRows([]);
@@ -183,19 +185,24 @@ export default function ModerationPage() {
         </div>
       </section>
 
-      <button
-        type="button"
-        onClick={() => void loadRows(status)}
-        style={{
-          ...floatingRefreshStyle,
-          ...(loading ? floatingRefreshLoadingStyle : null),
-        }}
-        aria-label="Rafraîchir les escalades"
-        title="Rafraîchir"
-        disabled={loading}
-      >
-        ↻
-      </button>
+      <div style={floatingRefreshWrapStyle}>
+        <span style={floatingRefreshLabelStyle}>
+          Dernière maj: {lastRefreshAt ? lastRefreshAt.toLocaleTimeString("fr-FR", { hour12: false }) : "--:--:--"}
+        </span>
+        <button
+          type="button"
+          onClick={() => void loadRows(status)}
+          style={{
+            ...floatingRefreshStyle,
+            ...(loading ? floatingRefreshLoadingStyle : null),
+          }}
+          aria-label="Rafraîchir les escalades"
+          title="Rafraîchir"
+          disabled={loading}
+        >
+          ↻
+        </button>
+      </div>
 
       <style jsx>{`
         @keyframes spinRefresh {
@@ -310,10 +317,6 @@ const reopenBtnStyle: CSSProperties = {
 };
 
 const floatingRefreshStyle: CSSProperties = {
-  position: "fixed",
-  right: 16,
-  bottom: 16,
-  zIndex: 40,
   border: "none",
   borderRadius: 999,
   width: 44,
@@ -325,6 +328,25 @@ const floatingRefreshStyle: CSSProperties = {
   lineHeight: 1,
   cursor: "pointer",
   boxShadow: "0 8px 24px rgba(15, 23, 42, 0.25)",
+};
+
+const floatingRefreshWrapStyle: CSSProperties = {
+  position: "fixed",
+  right: 16,
+  bottom: 16,
+  zIndex: 40,
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 8,
+};
+
+const floatingRefreshLabelStyle: CSSProperties = {
+  background: "rgba(15, 23, 42, 0.82)",
+  color: "#fff",
+  borderRadius: 999,
+  padding: "7px 10px",
+  fontSize: 12,
+  fontWeight: 700,
 };
 
 const floatingRefreshLoadingStyle: CSSProperties = {
