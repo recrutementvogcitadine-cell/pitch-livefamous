@@ -29,8 +29,11 @@ type PageParams = { id?: string } | Promise<{ id?: string }>;
 export default function LiveViewerPage({ params }: { params: PageParams }) {
   const [status, setStatus] = useState("Connexion au live...");
   const [resolvedId, setResolvedId] = useState("");
+  const [hasVideo, setHasVideo] = useState(false);
+  const [retryTick, setRetryTick] = useState(0);
   const remoteVideoRef = useRef<HTMLDivElement | null>(null);
   const clientRef = useRef<AgoraClient | null>(null);
+  const [isStandaloneIOS, setIsStandaloneIOS] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -41,16 +44,30 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
       return /iPhone|iPad|iPod/i.test(ua);
     };
 
-    const fetchViewerToken = async (liveId: string) => {
-      const tokenResponse = await fetch(`/api/agora/token?channel=${encodeURIComponent(liveId)}&role=subscriber`, {
-        cache: "no-store",
-      });
-      if (!tokenResponse.ok) return null;
-      const body = (await tokenResponse.json()) as { token?: string };
-      return body.token ?? null;
+    const isStandaloneMode = () => {
+      if (typeof window === "undefined") return false;
+      const nav = window.navigator as Navigator & { standalone?: boolean };
+      return Boolean(nav.standalone) || window.matchMedia("(display-mode: standalone)").matches;
     };
 
-    const connectWithCodec = async (liveId: string, appId: string, codec: "vp8" | "h264") => {
+    const fetchViewerToken = async (channel: string) => {
+      const tokenResponse = await fetch(`/api/agora/token?channel=${encodeURIComponent(channel)}&role=subscriber`, {
+        cache: "no-store",
+      });
+      if (tokenResponse.ok) {
+        const body = (await tokenResponse.json()) as { token?: string };
+        return body.token ?? null;
+      }
+
+      const publisherFallback = await fetch(`/api/agora/token?channel=${encodeURIComponent(channel)}&role=publisher`, {
+        cache: "no-store",
+      });
+      if (!publisherFallback.ok) return null;
+      const fallbackBody = (await publisherFallback.json()) as { token?: string };
+      return fallbackBody.token ?? null;
+    };
+
+    const connectWithCodec = async (channel: string, appId: string, codec: "vp8" | "h264") => {
       const agoraModule = await import("agora-rtc-sdk-ng");
       const AgoraRTC = (agoraModule.default ?? agoraModule) as unknown as AgoraSDK;
       const client = AgoraRTC.createClient({ mode: "rtc", codec });
@@ -69,6 +86,7 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
           remoteVideoRef.current.innerHTML = "";
           remoteVideoRef.current.appendChild(player);
           user.videoTrack.play(player);
+          setHasVideo(true);
           setStatus("EN DIRECT");
         }
 
@@ -79,10 +97,10 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
 
       let token: string | null = null;
       try {
-        token = await fetchViewerToken(liveId);
+        token = await fetchViewerToken(channel);
       } catch {}
 
-      await client.join(appId, liveId, token, null);
+      await client.join(appId, channel, token, null);
     };
 
     const boot = async () => {
@@ -91,6 +109,8 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
 
       if (!active) return;
       setResolvedId(liveId);
+      setHasVideo(false);
+      setIsStandaloneIOS(isIOSDevice() && isStandaloneMode());
 
       if (!liveId) {
         setStatus("Live introuvable.");
@@ -104,27 +124,38 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
       }
 
       try {
-        const primaryCodec: "vp8" | "h264" = isIOSDevice() ? "h264" : "vp8";
-        const fallbackCodec: "vp8" | "h264" = primaryCodec === "h264" ? "vp8" : "h264";
+        const codecs: ("vp8" | "h264")[] = isIOSDevice() ? ["h264", "vp8"] : ["vp8", "h264"];
+        const channels = Array.from(new Set([liveId, "test-channel"]));
 
-        try {
-          await connectWithCodec(liveId, appId, primaryCodec);
-        } catch {
-          const existingClient = clientRef.current;
-          if (existingClient) {
+        let connected = false;
+
+        for (const channel of channels) {
+          if (connected) break;
+          for (const codec of codecs) {
+            if (connected) break;
+            setStatus(`Connexion... (${channel})`);
             try {
-              await existingClient.leave();
-            } catch {}
+              await connectWithCodec(channel, appId, codec);
+              connected = true;
+            } catch {
+              const existingClient = clientRef.current;
+              if (existingClient) {
+                try {
+                  await existingClient.leave();
+                } catch {}
+              }
+            }
           }
-          await connectWithCodec(liveId, appId, fallbackCodec);
         }
 
-        if (active) {
+        if (active && connected) {
           setStatus("Connecté. En attente de la vidéo...");
+        } else if (active && !connected) {
+          setStatus("Impossible de se connecter au live. Touchez Réessayer.");
         }
-      } catch (error: unknown) {
+      } catch {
         if (!active) return;
-        setStatus(`Erreur de lecture: ${error instanceof Error ? error.message : String(error)}`);
+        setStatus("Lecture indisponible pour le moment. Touchez Réessayer.");
       }
     };
 
@@ -140,7 +171,13 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
         remoteVideoRef.current.innerHTML = "";
       }
     };
-  }, [params]);
+  }, [params, retryTick]);
+
+  const openInSafari = () => {
+    if (typeof window === "undefined") return;
+    const current = window.location.href;
+    window.open(current, "_blank", "noopener,noreferrer");
+  };
 
   return (
     <main style={{ minHeight: "100vh", background: "#000", color: "#fff", fontFamily: "system-ui, sans-serif" }}>
@@ -148,7 +185,7 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
         <Link href="/watch" style={{ color: "#93c5fd", textDecoration: "none", fontWeight: 700 }}>
           ← Retour au flux
         </Link>
-        <span style={{ fontSize: 13, opacity: 0.9 }}>{status}</span>
+        <span style={{ fontSize: 13, opacity: 0.9 }}>{hasVideo ? "EN DIRECT" : "Chargement"}</span>
       </header>
 
       <section style={{ height: "calc(100vh - 64px)", padding: 12 }}>
@@ -161,8 +198,61 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
             border: "1px solid rgba(255,255,255,0.2)",
             background: "radial-gradient(circle at 30% 20%, #1d4ed8 0%, #0f172a 45%, #020617 100%)",
             overflow: "hidden",
+            position: "relative",
           }}
-        />
+        >
+          {!hasVideo ? (
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                display: "grid",
+                placeItems: "center",
+                textAlign: "center",
+                padding: 18,
+                background: "rgba(2,6,23,0.35)",
+              }}
+            >
+              <div style={{ maxWidth: 320 }}>
+                <p style={{ margin: "0 0 10px", fontWeight: 700 }}>{status}</p>
+                <button
+                  type="button"
+                  onClick={() => setRetryTick((value) => value + 1)}
+                  style={{
+                    border: "1px solid rgba(255,255,255,0.35)",
+                    borderRadius: 999,
+                    padding: "9px 14px",
+                    background: "rgba(37,99,235,0.85)",
+                    color: "#fff",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  Réessayer
+                </button>
+                {isStandaloneIOS ? (
+                  <div style={{ marginTop: 10 }}>
+                    <button
+                      type="button"
+                      onClick={openInSafari}
+                      style={{
+                        border: "1px solid rgba(255,255,255,0.28)",
+                        borderRadius: 999,
+                        padding: "8px 13px",
+                        background: "rgba(15,23,42,0.8)",
+                        color: "#fff",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                      }}
+                    >
+                      Ouvrir dans Safari
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+        </div>
       </section>
 
       {resolvedId ? (
