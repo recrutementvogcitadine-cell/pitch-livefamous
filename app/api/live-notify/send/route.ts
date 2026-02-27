@@ -156,6 +156,14 @@ export async function POST(req: Request) {
       await admin.from("live_push_subscriptions").delete().in("endpoint", staleEndpoints);
     }
 
+    await admin.from("live_notification_events").insert({
+      creator_user_id: user.id,
+      live_id: liveId,
+      follower_count: followerIds.length,
+      sent_count: sent,
+      created_at: new Date().toISOString(),
+    });
+
     return NextResponse.json({ ok: true, sent, followers: followerIds.length }, { status: 200 });
   } catch (error: unknown) {
     return NextResponse.json({ error: "send live notify failed", detail: String(error) }, { status: 500 });

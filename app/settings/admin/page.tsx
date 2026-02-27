@@ -18,6 +18,17 @@ type RoleResponse = {
   error?: string;
 };
 
+type LiveNotifyStats = {
+  followersLinks: number;
+  creatorsFollowed: number;
+  uniqueFollowers: number;
+  pushSubscriptions: number;
+  notificationsSentTotal: number;
+  notificationsEvents: number;
+  lastSentAt?: string | null;
+  eventsTableMissing?: boolean;
+};
+
 const actionItems = [
   {
     href: "/settings/moderation",
@@ -54,6 +65,8 @@ export default function AdminDashboardPage() {
   const [currentRole, setCurrentRole] = useState<AppRole>("agent");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loadingStats, setLoadingStats] = useState(true);
+  const [notifyStats, setNotifyStats] = useState<LiveNotifyStats | null>(null);
 
   const canAssignSuperAdmin = currentRole === "super_admin";
 
@@ -97,6 +110,26 @@ export default function AdminDashboardPage() {
 
   useEffect(() => {
     void loadRoles();
+  }, []);
+
+  const loadNotifyStats = async () => {
+    setLoadingStats(true);
+    try {
+      const response = await fetch("/api/admin/live-notify/stats", { cache: "no-store" });
+      const body = (await response.json()) as LiveNotifyStats & { error?: string };
+      if (!response.ok) {
+        throw new Error(body.error ?? "Impossible de charger les stats notifications.");
+      }
+      setNotifyStats(body);
+    } catch {
+      setNotifyStats(null);
+    } finally {
+      setLoadingStats(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadNotifyStats();
   }, []);
 
   const updateRole = async (userId: string) => {
@@ -166,6 +199,63 @@ export default function AdminDashboardPage() {
             <li>Confirmer /api/agora/token pour la disponibilité RTC</li>
             <li>Tester un message IA Live sur /watch après chaque déploiement</li>
           </ul>
+        </section>
+
+        <section style={roleCardStyle}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <div>
+              <h2 style={{ margin: 0 }}>Followers & Notifications</h2>
+              <p style={{ margin: "6px 0 0", color: "#475569" }}>
+                Indicateurs live followers, abonnements push et notifications envoyées.
+              </p>
+            </div>
+            <button type="button" onClick={() => void loadNotifyStats()} style={action3DDarkStyle}>
+              Rafraîchir
+            </button>
+          </div>
+
+          {loadingStats ? <p style={{ margin: 0 }}>Chargement des stats...</p> : null}
+
+          {!loadingStats && notifyStats ? (
+            <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))" }}>
+              <article style={metricCardStyle}>
+                <small style={metricLabelStyle}>Liens followers</small>
+                <strong style={metricValueStyle}>{notifyStats.followersLinks}</strong>
+              </article>
+              <article style={metricCardStyle}>
+                <small style={metricLabelStyle}>Créateurs suivis</small>
+                <strong style={metricValueStyle}>{notifyStats.creatorsFollowed}</strong>
+              </article>
+              <article style={metricCardStyle}>
+                <small style={metricLabelStyle}>Followers uniques</small>
+                <strong style={metricValueStyle}>{notifyStats.uniqueFollowers}</strong>
+              </article>
+              <article style={metricCardStyle}>
+                <small style={metricLabelStyle}>Abonnements push</small>
+                <strong style={metricValueStyle}>{notifyStats.pushSubscriptions}</strong>
+              </article>
+              <article style={metricCardStyle}>
+                <small style={metricLabelStyle}>Notifications envoyées</small>
+                <strong style={metricValueStyle}>{notifyStats.notificationsSentTotal}</strong>
+              </article>
+              <article style={metricCardStyle}>
+                <small style={metricLabelStyle}>Campagnes</small>
+                <strong style={metricValueStyle}>{notifyStats.notificationsEvents}</strong>
+              </article>
+            </div>
+          ) : null}
+
+          {!loadingStats && notifyStats?.lastSentAt ? (
+            <p style={{ margin: 0, color: "#334155", fontSize: 13 }}>
+              Dernier envoi: {new Date(notifyStats.lastSentAt).toLocaleString("fr-FR")}
+            </p>
+          ) : null}
+
+          {!loadingStats && notifyStats?.eventsTableMissing ? (
+            <p style={{ margin: 0, color: "#92400e", fontSize: 13 }}>
+              Historique d&apos;envoi indisponible: exécuter le SQL `live_notification_events` en prod.
+            </p>
+          ) : null}
         </section>
 
         <section style={roleCardStyle}>
@@ -339,4 +429,25 @@ const selectStyle: CSSProperties = {
   borderRadius: 10,
   padding: "8px 10px",
   fontWeight: 600,
+};
+
+const metricCardStyle: CSSProperties = {
+  border: "1px solid #dbeafe",
+  borderRadius: 10,
+  background: "#fff",
+  padding: 10,
+  display: "grid",
+  gap: 4,
+};
+
+const metricLabelStyle: CSSProperties = {
+  color: "#64748b",
+  fontWeight: 700,
+  fontSize: 12,
+};
+
+const metricValueStyle: CSSProperties = {
+  color: "#0f172a",
+  fontSize: 22,
+  lineHeight: 1,
 };

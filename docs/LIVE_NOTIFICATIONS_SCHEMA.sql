@@ -23,6 +23,21 @@ create table if not exists public.live_push_subscriptions (
 create index if not exists live_push_subscriptions_user_idx
   on public.live_push_subscriptions (user_id);
 
+create table if not exists public.live_notification_events (
+  id bigint generated always as identity primary key,
+  creator_user_id uuid not null,
+  live_id uuid not null,
+  follower_count integer not null default 0,
+  sent_count integer not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists live_notification_events_created_idx
+  on public.live_notification_events (created_at desc);
+
+create index if not exists live_notification_events_creator_idx
+  on public.live_notification_events (creator_user_id);
+
 -- Keep updated_at fresh on upserts/updates.
 create or replace function public.set_updated_at_timestamp()
 returns trigger

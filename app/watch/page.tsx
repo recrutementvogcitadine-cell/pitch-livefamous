@@ -55,6 +55,15 @@ export default function WatchPage() {
   const [notifyByLive, setNotifyByLive] = useState<Record<string, string>>({});
   const [notifyLoadingByLive, setNotifyLoadingByLive] = useState<Record<string, boolean>>({});
   const appLogo = useAppLogo();
+  const followedLivesCount = useMemo(
+    () =>
+      lives.filter((live) => {
+        if (!live.creator_id) return false;
+        if (currentUserId && live.creator_id === currentUserId) return false;
+        return Boolean(followingByCreator[live.creator_id]);
+      }).length,
+    [lives, followingByCreator, currentUserId]
+  );
 
   const client = useMemo(() => {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -492,6 +501,11 @@ export default function WatchPage() {
         }}
         onScroll={onReachEnd}
       >
+        {followedLivesCount > 0 ? (
+          <div style={followedLivesBannerStyle}>
+            🔔 {followedLivesCount} live{followedLivesCount > 1 ? "s" : ""} de créateur{followedLivesCount > 1 ? "s" : ""} suivi{followedLivesCount > 1 ? "s" : ""} en ce moment
+          </div>
+        ) : null}
         {lives.map((live) => (
           <section key={live.id} style={slideStyle}>
             <aside style={actionRailStyle}>
@@ -523,6 +537,9 @@ export default function WatchPage() {
               />
               <span style={badgeStyle}>EN DIRECT</span>
               <span style={aiBadgeStyle}>Créateur virtuel IA</span>
+              {live.creator_id && currentUserId && live.creator_id !== currentUserId && followingByCreator[live.creator_id] ? (
+                <span style={followedCreatorBadgeStyle}>Créateur suivi</span>
+              ) : null}
               <div style={{ margin: "8px 0 0", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                 <p style={{ margin: 0, opacity: 0.95, fontWeight: 700 }}>
                   @{live.creator_id ? live.creator_id.slice(0, 8) : "createur"}
@@ -806,6 +823,36 @@ const shareToastStyle: CSSProperties = {
   padding: "8px 12px",
   borderRadius: 999,
   fontSize: 13,
+  fontWeight: 700,
+};
+
+const followedLivesBannerStyle: CSSProperties = {
+  position: "sticky",
+  top: 56,
+  zIndex: 14,
+  margin: "10px auto 0",
+  width: "fit-content",
+  maxWidth: "calc(100vw - 24px)",
+  padding: "8px 12px",
+  borderRadius: 999,
+  background: "rgba(30,41,59,0.9)",
+  border: "1px solid rgba(56,189,248,0.45)",
+  color: "#e0f2fe",
+  fontSize: 13,
+  fontWeight: 700,
+  backdropFilter: "blur(4px)",
+};
+
+const followedCreatorBadgeStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
+  borderRadius: 999,
+  padding: "5px 10px",
+  background: "rgba(56,189,248,0.22)",
+  border: "1px solid rgba(56,189,248,0.5)",
+  color: "#e0f2fe",
+  fontSize: 11,
   fontWeight: 700,
 };
 
