@@ -296,14 +296,12 @@ export default function WatchPage() {
   };
 
   const openLiveByTap = (event: MouseEvent<HTMLElement>, live: LiveRow) => {
-    if (live.creator_id && currentUserId && live.creator_id === currentUserId) return;
-
     const target = event.target as HTMLElement | null;
     if (target?.closest("a,button,input,select,textarea,label,video")) {
       return;
     }
 
-    const nextUrl = `/watch?startLiveId=${encodeURIComponent(live.id)}`;
+    const nextUrl = `/lives/${encodeURIComponent(live.id)}`;
     window.location.replace(nextUrl);
   };
 
