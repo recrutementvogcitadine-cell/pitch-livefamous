@@ -264,6 +264,7 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
       const message = payload.payload as LiveChatMessage;
       if (!message || typeof message.text !== "string" || !message.text.trim()) return;
       setChatMessages((prev) => {
+        if (prev.some((item) => item.id === message.id)) return prev;
         const next = [...prev, message];
         return next.slice(-30);
       });
@@ -402,18 +403,29 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
     };
 
     try {
+      setChatMessages((prev) => [...prev, message].slice(-30));
+      setChatInput("");
+
       if (chatChannelRef.current) {
-        await chatChannelRef.current.send({
+        void chatChannelRef.current.send({
           type: "broadcast",
           event: "chat-message",
           payload: message,
         });
-      } else {
-        setChatMessages((prev) => [...prev, message].slice(-30));
       }
-      setChatInput("");
 
-      if (!resolvedId || aiReplying) return;
+      if (!resolvedId) return;
+      if (aiReplying) {
+        const instantText = buildLocalAiFallback(text);
+        const instantMessage: LiveChatMessage = {
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          text: instantText.slice(0, 220),
+          author: "@akoua_ia",
+          createdAt: Date.now(),
+        };
+        setChatMessages((prev) => [...prev, instantMessage].slice(-30));
+        return;
+      }
       setAiReplying(true);
 
       const userTurn: LocalHistoryItem = { role: "user", content: text.slice(0, 500) };
@@ -442,14 +454,14 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
           createdAt: Date.now(),
         };
 
+        setChatMessages((prev) => [...prev, assistantMessage].slice(-30));
+
         if (chatChannelRef.current) {
-          await chatChannelRef.current.send({
+          void chatChannelRef.current.send({
             type: "broadcast",
             event: "chat-message",
             payload: assistantMessage,
           });
-        } else {
-          setChatMessages((prev) => [...prev, assistantMessage].slice(-30));
         }
 
         const assistantTurn: LocalHistoryItem = { role: "assistant", content: finalReplyText.slice(0, 500) };
@@ -464,17 +476,17 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
           createdAt: Date.now(),
         };
 
-        try {
-          if (chatChannelRef.current) {
+        setChatMessages((prev) => [...prev, fallbackMessage].slice(-30));
+
+        if (chatChannelRef.current) {
+          try {
             await chatChannelRef.current.send({
               type: "broadcast",
               event: "chat-message",
               payload: fallbackMessage,
             });
-          } else {
-            setChatMessages((prev) => [...prev, fallbackMessage].slice(-30));
-          }
-        } catch {}
+          } catch {}
+        }
 
         const assistantTurn: LocalHistoryItem = { role: "assistant", content: fallbackText.slice(0, 500) };
         setAiHistory([...nextHistory, assistantTurn].slice(-12));
