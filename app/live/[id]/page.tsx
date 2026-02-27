@@ -484,7 +484,11 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
           ))}
         </div>
 
-        <div
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            void sendChatMessage();
+          }}
           style={{
             display: "flex",
             alignItems: "center",
@@ -502,6 +506,7 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
             }}
             placeholder="Saisis ton message"
             maxLength={220}
+            enterKeyHint="send"
             style={{
               flex: 1,
               minWidth: 0,
@@ -525,7 +530,7 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
             ↗️
           </button>
           <button
-            type="button"
+            type="submit"
             onClick={() => void sendChatMessage()}
             disabled={chatSending || !chatInput.trim()}
             style={{
@@ -545,7 +550,7 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
           >
             Envoyer
           </button>
-        </div>
+        </form>
       </section>
 
     </main>
