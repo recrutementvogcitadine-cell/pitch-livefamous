@@ -1,0 +1,28 @@
+{
+  "creators": [
+    {
+      "email": "ia.nina@example.com",
+      "password": "DemoPass!Nina2026",
+      "displayName": "Nina Live",
+      "whatsapp": "+2250700000001",
+      "liveTitle": "Live IA - Nina",
+      "personalityPreset": "energique"
+    },
+    {
+      "email": "ia.malik@example.com",
+      "password": "DemoPass!Malik2026",
+      "displayName": "Malik Coach",
+      "whatsapp": "+2250700000002",
+      "liveTitle": "Live IA - Malik",
+      "personalityPreset": "coach"
+    },
+    {
+      "email": "ia.sara@example.com",
+      "password": "DemoPass!Sara2026",
+      "displayName": "Sara Vendeuse",
+      "whatsapp": "+2250700000003",
+      "liveTitle": "Live IA - Sara",
+      "personalityPreset": "vendeur"
+    }
+  ]
+}
