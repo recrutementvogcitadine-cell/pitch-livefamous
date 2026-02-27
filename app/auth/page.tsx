@@ -29,6 +29,13 @@ function isValidWhatsapp(value: string) {
   return digitsOnly.length >= 8;
 }
 
+function toWhatsappLink(value: string | undefined) {
+  if (!value) return null;
+  const normalized = value.replace(/[^\d]/g, "").trim();
+  if (!normalized) return null;
+  return `https://wa.me/${encodeURIComponent(normalized)}`;
+}
+
 export default function AuthPage() {
   const [mode, setMode] = useState<AuthMode>("signin");
   const [email, setEmail] = useState("");
@@ -50,6 +57,7 @@ export default function AuthPage() {
   }, []);
 
   const promoInfo = promoInfoForPlan(promoConfig, creatorPlan);
+  const adminWhatsappLink = toWhatsappLink(process.env.NEXT_PUBLIC_ADMIN_WHATSAPP);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -222,6 +230,11 @@ export default function AuthPage() {
           (forfait jour/semaine/mois) puis validation admin.
         </p>
 
+        <div style={{ fontSize: 13, color: "#334155", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 10, padding: 10 }}>
+          Validation créateur: statut automatique <strong>en attente</strong> après demande. Vérification finale via WhatsApp admin.
+          Aucun paiement n&apos;est effectué dans l&apos;application.
+        </div>
+
         <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
           <button
             type="button"
@@ -250,6 +263,13 @@ export default function AuthPage() {
         {mode === "creator" ? (
           <div style={{ fontSize: 13, color: "#1e3a8a", background: "#e0edff", border: "1px solid #bfdbfe", borderRadius: 10, padding: 10 }}>
             Demande créateur déclenchée depuis le bouton “Passer en live”.
+            {adminWhatsappLink ? (
+              <div style={{ marginTop: 8 }}>
+                <a href={adminWhatsappLink} target="_blank" rel="noreferrer" style={{ color: "#1d4ed8", fontWeight: 800 }}>
+                  Contacter admin sur WhatsApp
+                </a>
+              </div>
+            ) : null}
           </div>
         ) : null}
 
@@ -337,6 +357,13 @@ export default function AuthPage() {
           <div style={{ fontSize: 13, color: "#475569", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 10, padding: 10 }}>
             Aucun paiement sur l&apos;application. Après la demande, contactez l&apos;équipe sur WhatsApp pour envoyer les documents.
             Un admin validera votre compte avant activation live caméra.
+            {adminWhatsappLink ? (
+              <div style={{ marginTop: 8 }}>
+                <a href={adminWhatsappLink} target="_blank" rel="noreferrer" style={{ color: "#1d4ed8", fontWeight: 800 }}>
+                  Ouvrir WhatsApp admin
+                </a>
+              </div>
+            ) : null}
           </div>
         ) : null}
 
