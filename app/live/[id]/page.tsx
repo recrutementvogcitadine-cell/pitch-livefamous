@@ -356,7 +356,7 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
         <span style={{ fontSize: 13, opacity: 0.9 }}>{hasVideo ? "EN DIRECT" : "Chargement"}</span>
       </header>
 
-      <section style={{ height: "calc(100vh - 64px - env(safe-area-inset-bottom, 0px))", padding: 12 }}>
+      <section className="live-video-shell" style={{ padding: 12 }}>
         <div
           ref={remoteVideoRef}
           style={{
@@ -559,6 +559,18 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
           </button>
         </form>
       </section>
+
+      <style jsx>{`
+        .live-video-shell {
+          height: calc(100vh - 64px - env(safe-area-inset-bottom, 0px));
+        }
+
+        @media (max-width: 640px) {
+          .live-video-shell {
+            height: calc(100vh - 64px - env(safe-area-inset-bottom, 0px) - 10px);
+          }
+        }
+      `}</style>
 
     </main>
   );
