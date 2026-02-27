@@ -6,6 +6,7 @@ type LiveRecord = {
   title: string | null;
   status: string | null;
   created_at: string | null;
+  creator_id?: string | null;
   [key: string]: unknown;
 };
 
@@ -71,8 +72,34 @@ export default async function LiveDetailsPage({ params }: { params: PageParams }
       </p>
 
       <section style={{ border: "1px solid #dbeafe", borderRadius: 12, padding: 14, background: "#fff" }}>
-        <h2 style={{ marginTop: 0, fontSize: 18 }}>Données du live</h2>
-        <pre style={{ whiteSpace: "pre-wrap", margin: 0 }}>{JSON.stringify(live, null, 2)}</pre>
+        <h2 style={{ marginTop: 0, fontSize: 18 }}>Informations du live</h2>
+        <p style={{ margin: "8px 0" }}>
+          <strong>ID:</strong> {live.id}
+        </p>
+        <p style={{ margin: "8px 0" }}>
+          <strong>Créateur:</strong> {live.creator_id ? `@${live.creator_id.slice(0, 8)}` : "inconnu"}
+        </p>
+        <p style={{ margin: "8px 0" }}>
+          <strong>Statut:</strong> {live.status ?? "inconnu"}
+        </p>
+        <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <Link
+            href="/watch"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: 10,
+              padding: "10px 12px",
+              color: "#fff",
+              textDecoration: "none",
+              background: "#2563eb",
+              fontWeight: 700,
+            }}
+          >
+            Retour au flux live
+          </Link>
+        </div>
       </section>
     </main>
   );
