@@ -740,18 +740,6 @@ export default function WatchPage() {
                     <Link href="/auth?mode=creator" style={{ ...actionStyle, background: "rgba(30,41,59,0.9)" }}>
                       {buttonLabels.becomeCreatorLabel}
                     </Link>
-                    {live.creator_whatsapp ? (
-                      <a
-                        href={`https://wa.me/${encodeURIComponent(live.creator_whatsapp.replace(/[^\d]/g, ""))}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        style={whatsappActionStyle}
-                      >
-                        WhatsApp créateur
-                      </a>
-                    ) : (
-                      <span style={whatsappUnavailableStyle}>WhatsApp indisponible</span>
-                    )}
                   </>
                 ) : null}
                 {live.creator_id && live.creator_id === currentUserId ? (
@@ -972,22 +960,6 @@ const cameraIconBadgeStyle: CSSProperties = {
 const goLiveLabelStyle: CSSProperties = {
   lineHeight: 1,
   fontWeight: 800,
-};
-
-const whatsappActionStyle: CSSProperties = {
-  ...actionStyle,
-  background: "#16a34a",
-  border: "1px solid rgba(255,255,255,0.28)",
-  boxShadow: "0 8px 18px rgba(22,163,74,0.35)",
-};
-
-const whatsappUnavailableStyle: CSSProperties = {
-  ...actionStyle,
-  background: "rgba(100,116,139,0.65)",
-  border: "1px solid rgba(148,163,184,0.55)",
-  boxShadow: "none",
-  cursor: "not-allowed",
-  opacity: 0.85,
 };
 
 const newBadgeStyle: CSSProperties = {
