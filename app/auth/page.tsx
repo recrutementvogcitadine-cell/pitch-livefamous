@@ -73,6 +73,29 @@ export default function AuthPage() {
     void loadUser();
   }, [client]);
 
+  const onSignOut = async () => {
+    if (!client) {
+      setError("Configuration Supabase manquante.");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const { error: signOutError } = await client.auth.signOut();
+      if (signOutError) throw signOutError;
+
+      setUserState(null);
+      window.location.href = "/auth";
+    } catch (err: unknown) {
+      setError(toAuthErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setLoading(true);
@@ -315,6 +338,14 @@ export default function AuthPage() {
               Badge certifié: {userState.creatorVerified ? <span style={{ color: "#2563eb", fontWeight: 700 }}>✔ bleu</span> : "non"}
             </div>
             {userState.creatorPlan ? <div style={{ fontSize: 14 }}>Forfait demandé: {userState.creatorPlan}</div> : null}
+            <button
+              type="button"
+              onClick={() => void onSignOut()}
+              disabled={loading}
+              style={{ ...submitStyle, marginTop: 10, background: "#334155" }}
+            >
+              {loading ? "Déconnexion..." : "Se déconnecter"}
+            </button>
           </div>
         ) : (
           <p style={{ margin: 0, color: "#64748b" }}>Non connecté. Connectez-vous pour envoyer une demande créateur.</p>
