@@ -282,6 +282,24 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
   }, [resolvedId, supabaseClient]);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!("serviceWorker" in navigator)) return;
+
+    void navigator.serviceWorker
+      .getRegistrations()
+      .then((registrations) => {
+        const liveSwRegistrations = registrations.filter((registration) =>
+          registration.active?.scriptURL?.includes("/live-sw.js")
+        );
+
+        return Promise.all(
+          liveSwRegistrations.map((registration) => registration.unregister())
+        );
+      })
+      .catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
     if (!resolvedId || !supabaseClient) return;
 
     if (!viewerKeyRef.current && typeof window !== "undefined") {
