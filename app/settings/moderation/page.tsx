@@ -353,7 +353,7 @@ const floatingRefreshStyle: CSSProperties = {
 const floatingRefreshWrapStyle: CSSProperties = {
   position: "fixed",
   right: 16,
-  bottom: 16,
+  bottom: "calc(env(safe-area-inset-bottom, 0px) + 24px)",
   zIndex: 40,
   display: "inline-flex",
   alignItems: "center",
