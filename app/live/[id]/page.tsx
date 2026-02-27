@@ -282,6 +282,19 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
   }, [resolvedId, supabaseClient]);
 
   useEffect(() => {
+    if (hasVideo || safariOnlyMode) return;
+
+    const timer = window.setTimeout(() => {
+      setVideoUnavailable(true);
+      setStatus("Mode chat IA actif.");
+    }, 7000);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [hasVideo, safariOnlyMode, resolvedId, retryTick]);
+
+  useEffect(() => {
     if (typeof window === "undefined") return;
     if (!("serviceWorker" in navigator)) return;
 
@@ -565,18 +578,18 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
                 ) : (
                   <button
                     type="button"
-                    onClick={() => setRetryTick((value) => value + 1)}
+                    onClick={focusChat}
                     style={{
-                      border: "1px solid rgba(255,255,255,0.35)",
+                      border: "1px solid rgba(147,197,253,0.45)",
                       borderRadius: 999,
                       padding: "9px 14px",
-                      background: "rgba(37,99,235,0.85)",
+                      background: "rgba(15,23,42,0.88)",
                       color: "#fff",
                       fontWeight: 700,
                       cursor: "pointer",
                     }}
                   >
-                    Réessayer
+                    Ouvrir le chat IA
                   </button>
                 )}
               </div>
