@@ -360,11 +360,21 @@ export default function WatchPage() {
 
   const toggleFollow = async (creatorId: string | null) => {
     if (!creatorId || !currentUserId || creatorId === currentUserId) return;
+    if (!client) return;
 
     const current = Boolean(followingByCreator[creatorId]);
     setFollowLoadingByCreator((prev) => ({ ...prev, [creatorId]: true }));
 
     try {
+      const {
+        data: { user },
+      } = await client.auth.getUser();
+
+      if (!user) {
+        window.location.href = "/auth";
+        return;
+      }
+
       const authHeaders = await getAuthHeaders();
       const response = await fetch("/api/live-notify/follow", {
         method: "POST",
@@ -372,9 +382,18 @@ export default function WatchPage() {
         body: JSON.stringify({ creatorId, follow: !current }),
       });
 
-      const body = (await response.json()) as { ok?: boolean; following?: boolean; error?: string };
+      let body: { ok?: boolean; following?: boolean; error?: string } = {};
+      try {
+        body = (await response.json()) as { ok?: boolean; following?: boolean; error?: string };
+      } catch {}
+
+      if (response.status === 401) {
+        window.location.href = "/auth";
+        return;
+      }
+
       if (!response.ok || !body.ok) {
-        throw new Error(body.error ?? "action impossible");
+        throw new Error(body.error ? `${body.error} (HTTP ${response.status})` : `action impossible (HTTP ${response.status})`);
       }
 
       setFollowingByCreator((prev) => ({ ...prev, [creatorId]: Boolean(body.following) }));
