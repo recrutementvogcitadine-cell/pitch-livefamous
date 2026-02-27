@@ -303,7 +303,15 @@ export default function WatchPage() {
       return;
     }
 
-    window.location.href = `/watch?startLiveId=${encodeURIComponent(live.id)}`;
+    const nextUrl = `/watch?startLiveId=${encodeURIComponent(live.id)}`;
+    const currentPath = window.location.pathname;
+    const currentStartLiveId = new URLSearchParams(window.location.search).get("startLiveId") ?? "";
+
+    if (currentPath === "/watch" && currentStartLiveId === live.id) {
+      return;
+    }
+
+    window.location.replace(nextUrl);
   };
 
   const getAuthHeaders = async (): Promise<Record<string, string>> => {
