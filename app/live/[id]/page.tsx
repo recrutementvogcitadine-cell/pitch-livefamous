@@ -38,6 +38,7 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
   const [status, setStatus] = useState("Connexion au live...");
   const [resolvedId, setResolvedId] = useState("");
   const [hasVideo, setHasVideo] = useState(false);
+  const [videoUnavailable, setVideoUnavailable] = useState(false);
   const [liked, setLiked] = useState(false);
   const [shareMessage, setShareMessage] = useState<string | null>(null);
   const [retryTick, setRetryTick] = useState(0);
@@ -45,6 +46,7 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
   const [chatMessages, setChatMessages] = useState<LiveChatMessage[]>([]);
   const [chatAuthor, setChatAuthor] = useState("@spectateur");
   const [chatSending, setChatSending] = useState(false);
+  const chatInputRef = useRef<HTMLInputElement | null>(null);
   const [noVideoHint, setNoVideoHint] = useState(false);
   const remoteVideoRef = useRef<HTMLDivElement | null>(null);
   const clientRef = useRef<AgoraClient | null>(null);
@@ -136,6 +138,7 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
       if (!active) return;
       setResolvedId(liveId);
       setHasVideo(false);
+      setVideoUnavailable(false);
       const standaloneIOS = isIOSDevice() && isStandaloneMode();
       setIsStandaloneIOS(standaloneIOS);
       setSafariOnlyMode(standaloneIOS);
@@ -185,13 +188,16 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
         }
 
         if (active && connected) {
+          setVideoUnavailable(false);
           setStatus("Connecté. En attente de la vidéo...");
         } else if (active && !connected) {
-          setStatus("Impossible de se connecter au live. Touchez Réessayer.");
+          setVideoUnavailable(true);
+          setStatus("Vidéo indisponible pour ce live. Mode chat IA actif.");
         }
       } catch {
         if (!active) return;
-        setStatus("Lecture indisponible pour le moment. Touchez Réessayer.");
+        setVideoUnavailable(true);
+        setStatus("Lecture vidéo indisponible. Utilise le chat IA en bas.");
       }
     };
 
@@ -339,6 +345,13 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
     }
   };
 
+  const focusChat = () => {
+    const target = chatInputRef.current;
+    if (!target) return;
+    target.focus();
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+
   const sendChatMessage = async () => {
     const text = chatInput.trim();
     if (!text || !chatChannelRef.current || chatSending) return;
@@ -453,6 +466,22 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
                       Ouvrir dans Safari
                     </button>
                   </div>
+                ) : videoUnavailable ? (
+                  <button
+                    type="button"
+                    onClick={focusChat}
+                    style={{
+                      border: "1px solid rgba(147,197,253,0.45)",
+                      borderRadius: 999,
+                      padding: "9px 14px",
+                      background: "rgba(15,23,42,0.88)",
+                      color: "#fff",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Ouvrir le chat IA
+                  </button>
                 ) : (
                   <button
                     type="button"
@@ -548,6 +577,7 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
           }}
         >
           <input
+            ref={chatInputRef}
             value={chatInput}
             onChange={(event) => setChatInput(event.target.value)}
             onKeyDown={(event) => {
