@@ -37,7 +37,7 @@ export async function GET(req: Request) {
     const token = RtcTokenBuilder.buildTokenWithUid(appId, appCert, channel, uid, role, expire);
 
     return new Response(JSON.stringify({ token, channel, expires_at: expire }), { status: 200, headers: { 'Content-Type': 'application/json' } });
-  } catch (err: any) {
+  } catch (err: unknown) {
     return new Response(JSON.stringify({ error: String(err) }), { status: 500, headers: { 'Content-Type': 'application/json' } });
   }
 }

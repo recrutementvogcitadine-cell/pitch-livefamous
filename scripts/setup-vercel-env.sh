@@ -19,6 +19,11 @@ if [ -z "${VERCEL_PROJECT_ID:-}" ]; then
   exit 2
 fi
 
+TEAM_QUERY=""
+if [ -n "${VERCEL_TEAM_ID:-}" ]; then
+  TEAM_QUERY="?teamId=${VERCEL_TEAM_ID}"
+fi
+
 if [ ! -f "$ENV_FILE" ]; then
   echo ".env.local not found in project root ($ENV_FILE)"
   exit 2
@@ -34,7 +39,7 @@ create_env() {
   key="$1"
   val="$2"
   echo "Creating env: $key"
-  curl -s -X POST "https://api.vercel.com/v9/projects/${VERCEL_PROJECT_ID}/env" \
+  curl -s -X POST "https://api.vercel.com/v9/projects/${VERCEL_PROJECT_ID}/env${TEAM_QUERY}" \
     -H "Authorization: Bearer ${VERCEL_TOKEN}" \
     -H "Content-Type: application/json" \
     -d "{\"key\": \"${key}\", \"value\": \"${val}\", \"target\": [\"preview\",\"production\"], \"type\": \"encrypted\" }" \
@@ -49,7 +54,15 @@ declare -a KEYS=(
   "NEXT_PUBLIC_AGORA_APP_ID"
   "NEXT_PUBLIC_SUPABASE_URL"
   "NEXT_PUBLIC_SUPABASE_ANON_KEY"
-  "SUPABASE_SERVICE_ROLE"
+  "SUPABASE_SERVICE_ROLE_KEY"
+  "OPENAI_API_KEY"
+  "OPENAI_MODEL"
+  "OPENAI_COMPLEX_MODEL"
+  "LIVE_AI_COOLDOWN_MS"
+  "LIVE_AI_MAX_PER_MINUTE"
+  "LIVE_AI_ACTIVE_AGENT_SLOTS"
+  "LIVE_AI_MONTHLY_BUDGET_USD"
+  "LIVE_AI_MODERATOR_EMAILS"
 )
 
 for k in "${KEYS[@]}"; do

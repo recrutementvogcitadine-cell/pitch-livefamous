@@ -14,6 +14,12 @@ if (-not $env:VERCEL_PROJECT_ID) {
   Write-Error "VERCEL_PROJECT_ID environment variable is required. Set it with: $env:VERCEL_PROJECT_ID = 'project_id'"; exit 2
 }
 
+$teamQuery = ""
+if ($env:VERCEL_TEAM_ID) {
+  $encodedTeamId = [uri]::EscapeDataString($env:VERCEL_TEAM_ID)
+  $teamQuery = "?teamId=$encodedTeamId"
+}
+
 function Parse-EnvFile($path) {
   $pairs = @{}
   Get-Content $path | ForEach-Object {
@@ -41,20 +47,28 @@ $keys = @(
   'NEXT_PUBLIC_AGORA_APP_ID',
   'NEXT_PUBLIC_SUPABASE_URL',
   'NEXT_PUBLIC_SUPABASE_ANON_KEY',
-  'SUPABASE_SERVICE_ROLE'
+  'SUPABASE_SERVICE_ROLE_KEY',
+  'OPENAI_API_KEY',
+  'OPENAI_MODEL',
+  'OPENAI_COMPLEX_MODEL',
+  'LIVE_AI_COOLDOWN_MS',
+  'LIVE_AI_MAX_PER_MINUTE',
+  'LIVE_AI_ACTIVE_AGENT_SLOTS',
+  'LIVE_AI_MONTHLY_BUDGET_USD',
+  'LIVE_AI_MODERATOR_EMAILS'
 )
 
 foreach ($k in $keys) {
   if ($pairs.ContainsKey($k) -and $pairs[$k]) {
     $body = @{ key = $k; value = $pairs[$k]; target = @('preview','production'); type = 'encrypted' } | ConvertTo-Json -Depth 4
-    $uri = "https://api.vercel.com/v9/projects/$($env:VERCEL_PROJECT_ID)/env"
+    $uri = "https://api.vercel.com/v9/projects/$($env:VERCEL_PROJECT_ID)/env$teamQuery"
     try {
       Write-Host "Creating env $k..."
       $resp = Invoke-RestMethod -Uri $uri -Method Post -Headers @{ Authorization = "Bearer $($env:VERCEL_TOKEN)"; 'Content-Type' = 'application/json' } -Body $body -ErrorAction Stop
       Write-Host "Created: $($resp.key) (id: $($resp.id))"
     } catch {
       # If it already exists or API returns an error, show the message
-      Write-Warning "Failed to create $k: $($_.Exception.Message)"
+      Write-Warning "Failed to create ${k}: $($_.Exception.Message)"
     }
   } else {
     Write-Host "Skipping $k (not present in .env.local)"
