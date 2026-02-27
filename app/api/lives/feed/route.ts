@@ -81,7 +81,7 @@ export async function GET(req: Request) {
 
     let query = adminClient
       .from("lives")
-      .select("id, title, status, created_at, creator_id, creator_verified, creator_is_certified, is_certified")
+      .select("id, title, status, created_at, creator_id")
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);
 
