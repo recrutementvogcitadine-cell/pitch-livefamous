@@ -642,7 +642,7 @@ export default function WatchPage() {
                           ? "Masquer ma caméra"
                           : "Afficher ma caméra"}
                     </button>
-                    <Link href="/agora-test" style={{ ...actionStyle, background: "rgba(14,116,144,0.9)" }}>
+                    <Link href="/agora-test" style={goLiveActionStyle}>
                       Passer en live caméra
                     </Link>
                     <Link href="/auth?mode=creator" style={{ ...actionStyle, background: "rgba(30,41,59,0.9)" }}>
@@ -758,7 +758,7 @@ export default function WatchPage() {
           <video ref={previewVideoRef} autoPlay playsInline muted style={cameraVideoStyle} />
           {previewError ? <p style={{ margin: 0, color: "#fecaca", fontSize: 12 }}>Erreur caméra: {previewError}</p> : null}
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <Link href="/agora-test" style={{ ...actionStyle, background: "rgba(14,116,144,0.95)" }}>
+            <Link href="/agora-test" style={goLiveActionStyle}>
               Passer en live (créateur)
             </Link>
             <Link href="/auth?mode=creator" style={{ ...actionStyle, background: "rgba(30,41,59,0.95)" }}>
@@ -848,6 +848,13 @@ const actionStyle: CSSProperties = {
   textDecoration: "none",
   background: "#2563eb",
   fontWeight: 700,
+};
+
+const goLiveActionStyle: CSSProperties = {
+  ...actionStyle,
+  background: "#f97316",
+  border: "1px solid rgba(255,255,255,0.28)",
+  boxShadow: "0 8px 18px rgba(249,115,22,0.4)",
 };
 
 const inlineActionButtonStyle: CSSProperties = {
