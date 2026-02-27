@@ -182,6 +182,15 @@ export default function ModerationPage() {
           ))}
         </div>
       </section>
+
+      <button
+        type="button"
+        onClick={() => void loadRows(status)}
+        style={floatingRefreshStyle}
+        aria-label="Rafraîchir les escalades"
+      >
+        Rafraîchir
+      </button>
     </main>
   );
 }
@@ -282,4 +291,19 @@ const reopenBtnStyle: CSSProperties = {
   color: "#fff",
   fontWeight: 700,
   cursor: "pointer",
+};
+
+const floatingRefreshStyle: CSSProperties = {
+  position: "fixed",
+  right: 16,
+  bottom: 16,
+  zIndex: 40,
+  border: "none",
+  borderRadius: 999,
+  padding: "10px 14px",
+  background: "#1d4ed8",
+  color: "#fff",
+  fontWeight: 800,
+  cursor: "pointer",
+  boxShadow: "0 8px 24px rgba(15, 23, 42, 0.25)",
 };
