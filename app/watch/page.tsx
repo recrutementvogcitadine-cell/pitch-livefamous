@@ -94,7 +94,7 @@ export default function WatchPage() {
 
         await loadLives(0, false);
       } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : String(err));
+        setError(toDisplayErrorMessage(err));
       } finally {
         setLoading(false);
       }
@@ -113,7 +113,7 @@ export default function WatchPage() {
     try {
       await loadLives(offset, true);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(toDisplayErrorMessage(err));
     }
   };
 
@@ -719,4 +719,40 @@ const srOnlyStyle: CSSProperties = {
 
 function isCreatorCertified(live: LiveRow) {
   return Boolean(live.creator_verified || live.creator_is_certified || live.is_certified);
+}
+
+function toDisplayErrorMessage(err: unknown): string {
+  if (err instanceof Error) {
+    return err.message;
+  }
+
+  if (typeof err === "string") {
+    return err;
+  }
+
+  if (err && typeof err === "object") {
+    const message = Reflect.get(err, "message");
+    if (typeof message === "string" && message.trim().length > 0) {
+      return message;
+    }
+
+    const errorDescription = Reflect.get(err, "error_description");
+    if (typeof errorDescription === "string" && errorDescription.trim().length > 0) {
+      return errorDescription;
+    }
+
+    const error = Reflect.get(err, "error");
+    if (typeof error === "string" && error.trim().length > 0) {
+      return error;
+    }
+
+    try {
+      const serialized = JSON.stringify(err);
+      if (serialized && serialized !== "{}") {
+        return serialized;
+      }
+    } catch {}
+  }
+
+  return "Une erreur est survenue pendant le chargement du live.";
 }

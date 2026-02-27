@@ -155,7 +155,7 @@ export default function AuthPage() {
         });
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(toAuthErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -328,6 +328,62 @@ export default function AuthPage() {
 
 function promoInfoForPlan(config: PromoConfig, plan: CreatorPlan) {
   return evaluatePromo(config, plan);
+}
+
+function toAuthErrorMessage(err: unknown): string {
+  if (err instanceof Error) {
+    return normalizeAuthErrorMessage(err.message);
+  }
+
+  if (typeof err === "string") {
+    return normalizeAuthErrorMessage(err);
+  }
+
+  if (err && typeof err === "object") {
+    const maybeMessage = Reflect.get(err, "message");
+    if (typeof maybeMessage === "string" && maybeMessage.trim().length > 0) {
+      return normalizeAuthErrorMessage(maybeMessage);
+    }
+
+    const maybeErrorDescription = Reflect.get(err, "error_description");
+    if (typeof maybeErrorDescription === "string" && maybeErrorDescription.trim().length > 0) {
+      return normalizeAuthErrorMessage(maybeErrorDescription);
+    }
+
+    const maybeError = Reflect.get(err, "error");
+    if (typeof maybeError === "string" && maybeError.trim().length > 0) {
+      return normalizeAuthErrorMessage(maybeError);
+    }
+  }
+
+  return "Erreur de connexion. Vérifiez vos informations puis réessayez.";
+}
+
+function normalizeAuthErrorMessage(raw: string): string {
+  const value = raw.trim();
+  const lower = value.toLowerCase();
+
+  if (lower.includes("email signups are disabled")) {
+    return "Les inscriptions email sont désactivées. Activez Email provider dans Supabase Auth > Providers.";
+  }
+
+  if (lower.includes("user already registered")) {
+    return "Cet email existe déjà. Connectez-vous ou utilisez “mot de passe oublié” dans Supabase.";
+  }
+
+  if (lower.includes("invalid login credentials")) {
+    return "Email ou mot de passe invalide. Réessayez ou faites une réinitialisation du mot de passe.";
+  }
+
+  if (lower.includes("email not confirmed") || lower.includes("signup requires email verification")) {
+    return "Email non confirmé. Vérifiez votre boîte mail ou désactivez temporairement la confirmation dans Supabase pour les tests.";
+  }
+
+  if (value === "[object Object]") {
+    return "Erreur d'authentification non lisible. Vérifiez la configuration Supabase et réessayez.";
+  }
+
+  return value;
 }
 
 const tabStyle: CSSProperties = {
