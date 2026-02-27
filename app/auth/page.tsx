@@ -357,11 +357,11 @@ export default function AuthPage() {
         {mode === "creator" && showCreatorWhatsappNotice ? (
           <div style={{ fontSize: 13, color: "#166534", background: "#ecfdf3", border: "1px solid #86efac", borderRadius: 10, padding: 10 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 800 }}>
-              <span aria-hidden="true">🟢</span>
-              <span>WhatsApp requis pour identification</span>
+              <span aria-hidden="true">📲</span>
+              <span>Inscription créateur en attente de validation</span>
             </div>
             <p style={{ margin: "6px 0 0" }}>
-              Contactez-nous via WhatsApp pour vérification et activation de votre compte créateur.
+              Contactez-nous via WhatsApp pour identification et activation de votre compte créateur.
             </p>
             {adminWhatsappLink ? (
               <div style={{ marginTop: 8 }}>
