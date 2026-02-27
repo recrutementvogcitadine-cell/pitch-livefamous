@@ -58,22 +58,23 @@ export default function WatchPage() {
   }, []);
 
   const loadLives = async (nextOffset: number, append: boolean) => {
-    if (!client) {
-      throw new Error("Configuration Supabase manquante.");
+    const response = await fetch(
+      `/api/lives/feed?offset=${encodeURIComponent(String(nextOffset))}&limit=${encodeURIComponent(String(PAGE_SIZE))}`,
+      { cache: "no-store" }
+    );
+
+    if (response.status === 401) {
+      window.location.href = "/auth";
+      return;
     }
 
-    const { data, error: queryError } = await client
-      .from("lives")
-      .select("*")
-      .eq("status", "live")
-      .order("created_at", { ascending: false })
-      .range(nextOffset, nextOffset + PAGE_SIZE - 1);
+    const body = (await response.json()) as { rows?: LiveRow[]; error?: string };
 
-    if (queryError) {
-      throw queryError;
+    if (!response.ok) {
+      throw new Error(body.error ?? "live feed fetch failed");
     }
 
-    const rows = (data ?? []) as LiveRow[];
+    const rows = Array.isArray(body.rows) ? body.rows : [];
     setLives((prev) => (append ? [...prev, ...rows] : rows));
     setOffset(nextOffset + rows.length);
     setHasMore(rows.length === PAGE_SIZE);
@@ -85,17 +86,6 @@ export default function WatchPage() {
       setError(null);
 
       try {
-        if (!client) {
-          setError("Configuration Supabase manquante.");
-          return;
-        }
-
-        const { data } = await client.auth.getUser();
-        if (!data.user) {
-          window.location.href = "/auth";
-          return;
-        }
-
         await loadLives(0, false);
       } catch (err: unknown) {
         setError(toDisplayErrorMessage(err));
@@ -106,7 +96,7 @@ export default function WatchPage() {
 
     void init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [client]);
+  }, []);
 
   const onReachEnd = async (event: UIEvent<HTMLDivElement>) => {
     if (!hasMore || loading) return;
