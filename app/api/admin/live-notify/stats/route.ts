@@ -74,7 +74,7 @@ export async function GET() {
     const auth = await requireRoleManager();
     if (!auth.ok) return auth.response;
 
-    const [followersRes, subscriptionsRes, eventsRes] = await Promise.all([
+    const [followersRes, subscriptionsRes, eventsRes, liveCreatorsRes] = await Promise.all([
       auth.adminClient.from("live_creator_followers").select("creator_user_id,follower_user_id", { count: "exact" }),
       auth.adminClient.from("live_push_subscriptions").select("user_id", { count: "exact" }),
       auth.adminClient
@@ -82,10 +82,12 @@ export async function GET() {
         .select("sent_count,created_at", { count: "exact" })
         .order("created_at", { ascending: false })
         .limit(1000),
+      auth.adminClient.from("lives").select("id", { count: "exact", head: true }).eq("status", "live"),
     ]);
 
     if (followersRes.error) return NextResponse.json({ error: followersRes.error.message }, { status: 500 });
     if (subscriptionsRes.error) return NextResponse.json({ error: subscriptionsRes.error.message }, { status: 500 });
+  if (liveCreatorsRes.error) return NextResponse.json({ error: liveCreatorsRes.error.message }, { status: 500 });
 
     const followersRows = followersRes.data ?? [];
     const subscriptionsRows = subscriptionsRes.data ?? [];
@@ -112,6 +114,7 @@ export async function GET() {
         notificationsEvents,
         lastSentAt,
         eventsTableMissing: Boolean(eventsRes.error),
+        liveCreatorsNow: liveCreatorsRes.count ?? 0,
       },
       { status: 200 }
     );

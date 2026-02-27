@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 
 type AgoraTrack = {
@@ -50,13 +50,15 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
   const [isStandaloneIOS, setIsStandaloneIOS] = useState(false);
   const [safariOnlyMode, setSafariOnlyMode] = useState(false);
   const chatChannelRef = useRef<ReturnType<NonNullable<ReturnType<typeof createClient>["channel"]>> | null>(null);
+  const presenceChannelRef = useRef<ReturnType<NonNullable<ReturnType<typeof createClient>["channel"]>> | null>(null);
+  const viewerKeyRef = useRef<string>("");
 
-  const supabaseClient = (() => {
+  const supabaseClient = useMemo(() => {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     if (!url || !anonKey) return null;
     return createClient(url, anonKey);
-  })();
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -247,6 +249,53 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
       if (chatChannelRef.current) {
         void supabaseClient.removeChannel(chatChannelRef.current);
         chatChannelRef.current = null;
+      }
+    };
+  }, [resolvedId, supabaseClient]);
+
+  useEffect(() => {
+    if (!resolvedId || !supabaseClient) return;
+
+    if (!viewerKeyRef.current && typeof window !== "undefined") {
+      const stored = window.localStorage.getItem("pitch_viewer_key");
+      if (stored && stored.trim()) {
+        viewerKeyRef.current = stored;
+      } else {
+        const generated = `viewer-${Math.random().toString(36).slice(2, 10)}-${Date.now().toString(36)}`;
+        viewerKeyRef.current = generated;
+        window.localStorage.setItem("pitch_viewer_key", generated);
+      }
+    }
+
+    const channel = supabaseClient.channel("live-presence-global", {
+      config: { presence: { key: viewerKeyRef.current || undefined } },
+    });
+
+    const trackPresence = async () => {
+      await channel.track({
+        role: "spectator",
+        liveId: resolvedId,
+        lastSeenAt: new Date().toISOString(),
+      });
+    };
+
+    channel.subscribe((status) => {
+      if (status === "SUBSCRIBED") {
+        void trackPresence();
+      }
+    });
+
+    const timer = window.setInterval(() => {
+      void trackPresence();
+    }, 20000);
+
+    presenceChannelRef.current = channel;
+
+    return () => {
+      window.clearInterval(timer);
+      if (presenceChannelRef.current) {
+        void supabaseClient.removeChannel(presenceChannelRef.current);
+        presenceChannelRef.current = null;
       }
     };
   }, [resolvedId, supabaseClient]);

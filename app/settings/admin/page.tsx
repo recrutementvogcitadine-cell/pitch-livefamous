@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useAppLogo } from "../../components/app-logo";
+import { createClient } from "@supabase/supabase-js";
 
 type AppRole = "super_admin" | "admin" | "agent";
 
@@ -19,6 +20,7 @@ type RoleResponse = {
 };
 
 type LiveNotifyStats = {
+  liveCreatorsNow?: number;
   followersLinks: number;
   creatorsFollowed: number;
   uniqueFollowers: number;
@@ -83,6 +85,7 @@ export default function AdminDashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [loadingStats, setLoadingStats] = useState(true);
   const [notifyStats, setNotifyStats] = useState<LiveNotifyStats | null>(null);
+  const [realtimeSpectators, setRealtimeSpectators] = useState(0);
   const [loadingBranding, setLoadingBranding] = useState(true);
   const [savingBranding, setSavingBranding] = useState(false);
   const [branding, setBranding] = useState<BrandingSettings>({
@@ -100,6 +103,13 @@ export default function AdminDashboardPage() {
   });
 
   const canAssignSuperAdmin = currentRole === "super_admin";
+
+  const realtimeClient = useMemo(() => {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!url || !anonKey) return null;
+    return createClient(url, anonKey);
+  }, []);
 
   const roleOptions = useMemo(
     () =>
@@ -161,7 +171,49 @@ export default function AdminDashboardPage() {
 
   useEffect(() => {
     void loadNotifyStats();
+
+    const refreshInterval = window.setInterval(() => {
+      void loadNotifyStats();
+    }, 10000);
+
+    return () => {
+      window.clearInterval(refreshInterval);
+    };
   }, []);
+
+  useEffect(() => {
+    if (!realtimeClient) return;
+
+    const channel = realtimeClient.channel("live-presence-global");
+
+    const recomputePresence = () => {
+      const now = Date.now();
+      const states = channel.presenceState() as Record<string, Array<{ role?: string; lastSeenAt?: string }>>;
+      let total = 0;
+
+      for (const metas of Object.values(states)) {
+        const isActiveSpectator = metas.some((meta) => {
+          if (meta.role !== "spectator") return false;
+          if (!meta.lastSeenAt) return true;
+          const age = now - new Date(meta.lastSeenAt).getTime();
+          return Number.isFinite(age) && age <= 70000;
+        });
+        if (isActiveSpectator) total += 1;
+      }
+
+      setRealtimeSpectators(total);
+    };
+
+    channel.on("presence", { event: "sync" }, recomputePresence);
+    channel.subscribe();
+
+    const sanityTimer = window.setInterval(recomputePresence, 12000);
+
+    return () => {
+      window.clearInterval(sanityTimer);
+      void realtimeClient.removeChannel(channel);
+    };
+  }, [realtimeClient]);
 
   const loadBranding = async () => {
     setLoadingBranding(true);
@@ -350,6 +402,31 @@ export default function AdminDashboardPage() {
             <li>Confirmer /api/agora/token pour la disponibilité RTC</li>
             <li>Tester un message IA Live sur /watch après chaque déploiement</li>
           </ul>
+        </section>
+
+        <section style={liveRealtimeCardStyle}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <div>
+              <h2 style={{ margin: 0 }}>Compteurs Live en temps réel</h2>
+              <p style={{ margin: "6px 0 0", color: "#cbd5e1" }}>
+                Suivi instantané des créateurs actifs et des spectateurs connectés.
+              </p>
+            </div>
+            <button type="button" onClick={() => void loadNotifyStats()} style={action3DPrimaryStyle}>
+              Rafraîchir maintenant
+            </button>
+          </div>
+
+          <div style={bigCounterGridStyle}>
+            <article style={bigCounterItemStyle}>
+              <small style={bigCounterLabelStyle}>Créateurs en live</small>
+              <strong style={bigCounterValueStyle}>{notifyStats?.liveCreatorsNow ?? 0}</strong>
+            </article>
+            <article style={bigCounterItemStyle}>
+              <small style={bigCounterLabelStyle}>Spectateurs en direct</small>
+              <strong style={bigCounterValueStyle}>{realtimeSpectators}</strong>
+            </article>
+          </div>
         </section>
 
         <section style={roleCardStyle}>
@@ -710,6 +787,43 @@ const statusBoxStyle: CSSProperties = {
   borderRadius: 12,
   background: "#f8fafc",
   padding: 12,
+};
+
+const liveRealtimeCardStyle: CSSProperties = {
+  border: "1px solid #1e293b",
+  borderRadius: 14,
+  background: "linear-gradient(145deg, #0f172a, #1e293b)",
+  padding: 14,
+  display: "grid",
+  gap: 12,
+};
+
+const bigCounterGridStyle: CSSProperties = {
+  display: "grid",
+  gap: 10,
+  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+};
+
+const bigCounterItemStyle: CSSProperties = {
+  borderRadius: 14,
+  border: "1px solid rgba(148,163,184,0.35)",
+  background: "rgba(2,6,23,0.55)",
+  padding: 14,
+  display: "grid",
+  gap: 6,
+};
+
+const bigCounterLabelStyle: CSSProperties = {
+  color: "#93c5fd",
+  fontSize: 13,
+  fontWeight: 700,
+};
+
+const bigCounterValueStyle: CSSProperties = {
+  color: "#fff",
+  fontSize: 44,
+  fontWeight: 900,
+  lineHeight: 1,
 };
 
 const roleCardStyle: CSSProperties = {
