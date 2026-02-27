@@ -536,6 +536,7 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
         </Link>
         <span style={{ fontSize: 13, opacity: 0.9 }}>{hasVideo ? "EN DIRECT" : "LIVE IA (SANS CAMÉRA)"}</span>
       </header>
+      <div style={{ padding: "0 14px", color: "#93c5fd", fontSize: 11, opacity: 0.9 }}>live-build: marker-20260227-1</div>
 
       <section className="live-video-shell" style={{ padding: 12 }}>
         <div
