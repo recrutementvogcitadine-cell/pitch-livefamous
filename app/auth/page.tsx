@@ -46,6 +46,7 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showCreatorWhatsappNotice, setShowCreatorWhatsappNotice] = useState(false);
   const [userState, setUserState] = useState<UserState | null>(null);
   const [promoConfig, setPromoConfig] = useState<PromoConfig>(readPromoConfig());
 
@@ -118,6 +119,7 @@ export default function AuthPage() {
     setLoading(true);
     setMessage(null);
     setError(null);
+    setShowCreatorWhatsappNotice(false);
 
     if (!client) {
       setLoading(false);
@@ -189,9 +191,8 @@ export default function AuthPage() {
         });
         if (updateError) throw updateError;
 
-        setMessage(
-          "Demande créateur envoyée. Contactez-nous sur WhatsApp avec vos documents. Un admin activera votre accès live après validation."
-        );
+        setMessage("Demande créateur envoyée ✅");
+        setShowCreatorWhatsappNotice(true);
         setUserState({
           email: data.user.email,
           accountType: "creator_pending",
@@ -353,13 +354,18 @@ export default function AuthPage() {
           </button>
         </form>
 
-        {mode === "creator" ? (
-          <div style={{ fontSize: 13, color: "#475569", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 10, padding: 10 }}>
-            Aucun paiement sur l&apos;application. Après la demande, contactez l&apos;équipe sur WhatsApp pour envoyer les documents.
-            Un admin validera votre compte avant activation live caméra.
+        {mode === "creator" && showCreatorWhatsappNotice ? (
+          <div style={{ fontSize: 13, color: "#166534", background: "#ecfdf3", border: "1px solid #86efac", borderRadius: 10, padding: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 800 }}>
+              <span aria-hidden="true">🟢</span>
+              <span>WhatsApp requis pour identification</span>
+            </div>
+            <p style={{ margin: "6px 0 0" }}>
+              Contactez-nous via WhatsApp pour vérification et activation de votre compte créateur.
+            </p>
             {adminWhatsappLink ? (
               <div style={{ marginTop: 8 }}>
-                <a href={adminWhatsappLink} target="_blank" rel="noreferrer" style={{ color: "#1d4ed8", fontWeight: 800 }}>
+                <a href={adminWhatsappLink} target="_blank" rel="noreferrer" style={{ color: "#166534", fontWeight: 800 }}>
                   Ouvrir WhatsApp admin
                 </a>
               </div>
