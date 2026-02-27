@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createPublicClient } from "@supabase/supabase-js";
 
 type HistoryItem = { role: "user" | "assistant"; content: string };
 
@@ -661,12 +662,50 @@ async function saveEscalation(
   }
 }
 
+async function getAuthenticatedContext(req: Request) {
+  const cookieClient = await createClient();
+  const {
+    data: { user: cookieUser },
+  } = await cookieClient.auth.getUser();
+
+  if (cookieUser) {
+    return { supabase: cookieClient, user: cookieUser };
+  }
+
+  const authHeader = req.headers.get("authorization") ?? "";
+  const bearerPrefix = "bearer ";
+  const token = authHeader.toLowerCase().startsWith(bearerPrefix)
+    ? authHeader.slice(bearerPrefix.length).trim()
+    : "";
+
+  if (!token) {
+    return { supabase: cookieClient, user: null };
+  }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !anonKey) {
+    return { supabase: cookieClient, user: null };
+  }
+
+  const bearerClient = createPublicClient(supabaseUrl, anonKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
+
+  const {
+    data: { user: bearerUser },
+  } = await bearerClient.auth.getUser(token);
+
+  return { supabase: bearerClient as Awaited<ReturnType<typeof createClient>>, user: bearerUser };
+}
+
 export async function GET(req: Request) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const { supabase, user } = await getAuthenticatedContext(req);
 
     if (!user) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -732,10 +771,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const { supabase, user } = await getAuthenticatedContext(req);
 
     if (!user) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });

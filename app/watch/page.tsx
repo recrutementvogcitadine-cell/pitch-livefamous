@@ -131,6 +131,18 @@ export default function WatchPage() {
     }
   };
 
+  const getAuthHeaders = async (): Promise<Record<string, string>> => {
+    if (!client) return {};
+
+    const {
+      data: { session },
+    } = await client.auth.getSession();
+
+    if (!session?.access_token) return {};
+
+    return { Authorization: `Bearer ${session.access_token}` };
+  };
+
   const toggleAiPanel = async (liveId: string) => {
     const nextOpen = !aiPanelByLive[liveId];
     setAiPanelByLive((prev) => ({ ...prev, [liveId]: nextOpen }));
@@ -139,7 +151,10 @@ export default function WatchPage() {
     if (aiMessagesByLive[liveId]?.length) return;
 
     try {
-      const response = await fetch(`/api/live-ai/reply?liveId=${encodeURIComponent(liveId)}`);
+      const authHeaders = await getAuthHeaders();
+      const response = await fetch(`/api/live-ai/reply?liveId=${encodeURIComponent(liveId)}`, {
+        headers: authHeaders,
+      });
       const body = (await response.json()) as { messages?: LiveAiMessage[]; activeAgents?: LiveAiAgent[] };
       const remoteMessages = Array.isArray(body.messages) ? body.messages : [];
 
@@ -192,9 +207,10 @@ export default function WatchPage() {
     setAiLoadingByLive((prev) => ({ ...prev, [liveId]: true }));
 
     try {
+      const authHeaders = await getAuthHeaders();
       const response = await fetch("/api/live-ai/reply", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders },
         body: JSON.stringify({
           liveId,
           message: text,
