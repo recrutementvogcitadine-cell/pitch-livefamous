@@ -429,7 +429,7 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
           style={{
             position: "fixed",
             left: "50%",
-            bottom: 86,
+            bottom: "calc(env(safe-area-inset-bottom, 0px) + 86px)",
             transform: "translateX(-50%)",
             borderRadius: 999,
             padding: "8px 12px",
@@ -449,7 +449,7 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
           position: "fixed",
           left: 12,
           right: 12,
-          bottom: 14,
+          bottom: "calc(env(safe-area-inset-bottom, 0px) + 14px)",
           zIndex: 14,
           display: "grid",
           gap: 8,
