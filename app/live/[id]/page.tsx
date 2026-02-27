@@ -69,6 +69,7 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
   const [aiReplying, setAiReplying] = useState(false);
   const [aiHistory, setAiHistory] = useState<LocalHistoryItem[]>([]);
   const chatInputRef = useRef<HTMLInputElement | null>(null);
+  const welcomeSentRef = useRef(false);
   const remoteVideoRef = useRef<HTMLDivElement | null>(null);
   const clientRef = useRef<AgoraClient | null>(null);
   const [isStandaloneIOS, setIsStandaloneIOS] = useState(false);
@@ -283,6 +284,18 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
   }, [resolvedId, supabaseClient]);
 
   useEffect(() => {
+    if (!resolvedId || welcomeSentRef.current) return;
+    welcomeSentRef.current = true;
+    const welcomeMessage: LiveChatMessage = {
+      id: `welcome-${resolvedId}`,
+      text: "Je suis Akoua IA ✨ Je suis en ligne. Écris-moi et je te réponds tout de suite.",
+      author: "@akoua_ia",
+      createdAt: Date.now(),
+    };
+    setChatMessages((prev) => [...prev, welcomeMessage].slice(-30));
+  }, [resolvedId]);
+
+  useEffect(() => {
     if (hasVideo || safariOnlyMode) return;
 
     const timer = window.setTimeout(() => {
@@ -414,7 +427,24 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
         });
       }
 
-      if (!resolvedId) return;
+      const effectiveLiveId =
+        resolvedId ||
+        (typeof window !== "undefined"
+          ? window.location.pathname.split("/").filter(Boolean).at(-1) || ""
+          : "");
+
+      if (!effectiveLiveId) {
+        const instantText = buildLocalAiFallback(text);
+        const instantMessage: LiveChatMessage = {
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          text: instantText.slice(0, 220),
+          author: "@akoua_ia",
+          createdAt: Date.now(),
+        };
+        setChatMessages((prev) => [...prev, instantMessage].slice(-30));
+        return;
+      }
+
       if (aiReplying) {
         const instantText = buildLocalAiFallback(text);
         const instantMessage: LiveChatMessage = {
@@ -436,7 +466,7 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            liveId: resolvedId,
+            liveId: effectiveLiveId,
             message: text,
             history: nextHistory,
           }),
