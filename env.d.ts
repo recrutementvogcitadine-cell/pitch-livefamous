@@ -16,5 +16,6 @@ declare namespace NodeJS {
     LIVE_AI_ACTIVE_AGENT_SLOTS?: string;
     LIVE_AI_MONTHLY_BUDGET_USD?: string;
     LIVE_AI_MODERATOR_EMAILS?: string;
+    SUPER_ADMIN_EMAILS?: string;
   }
 }

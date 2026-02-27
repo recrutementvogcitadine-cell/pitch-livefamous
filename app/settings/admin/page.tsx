@@ -1,7 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
+
+type AppRole = "super_admin" | "admin" | "agent";
+
+type RoleUser = {
+  id: string;
+  email?: string;
+  role: AppRole;
+};
+
+type RoleResponse = {
+  currentUser?: { id: string; email?: string; role: AppRole };
+  users?: RoleUser[];
+  error?: string;
+};
 
 const actionItems = [
   {
@@ -31,6 +45,87 @@ const actionItems = [
 ];
 
 export default function AdminDashboardPage() {
+  const [loadingRoles, setLoadingRoles] = useState(true);
+  const [savingUserId, setSavingUserId] = useState<string | null>(null);
+  const [roleUsers, setRoleUsers] = useState<RoleUser[]>([]);
+  const [draftRoles, setDraftRoles] = useState<Record<string, AppRole>>({});
+  const [currentRole, setCurrentRole] = useState<AppRole>("agent");
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const canAssignSuperAdmin = currentRole === "super_admin";
+
+  const roleOptions = useMemo(
+    () =>
+      (canAssignSuperAdmin
+        ? (["super_admin", "admin", "agent"] as AppRole[])
+        : (["admin", "agent"] as AppRole[])),
+    [canAssignSuperAdmin]
+  );
+
+  const loadRoles = async () => {
+    setLoadingRoles(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const response = await fetch("/api/admin/roles", { cache: "no-store" });
+      const body = (await response.json()) as RoleResponse;
+
+      if (!response.ok) {
+        throw new Error(body.error ?? "Impossible de charger les rôles.");
+      }
+
+      const users = Array.isArray(body.users) ? body.users : [];
+      const nextDrafts: Record<string, AppRole> = {};
+      for (const item of users) {
+        nextDrafts[item.id] = item.role;
+      }
+
+      setRoleUsers(users);
+      setDraftRoles(nextDrafts);
+      setCurrentRole(body.currentUser?.role ?? "agent");
+    } catch (err: unknown) {
+      setRoleUsers([]);
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoadingRoles(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadRoles();
+  }, []);
+
+  const updateRole = async (userId: string) => {
+    const role = draftRoles[userId];
+    if (!role) return;
+
+    setSavingUserId(userId);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const response = await fetch("/api/admin/roles", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, role }),
+      });
+
+      const body = (await response.json()) as { ok?: boolean; error?: string };
+      if (!response.ok || !body.ok) {
+        throw new Error(body.error ?? "Mise à jour impossible.");
+      }
+
+      setRoleUsers((prev) => prev.map((item) => (item.id === userId ? { ...item, role } : item)));
+      setMessage("Rôle mis à jour ✅");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSavingUserId(null);
+    }
+  };
+
   return (
     <main style={pageStyle}>
       <section style={cardStyle}>
@@ -65,6 +160,66 @@ export default function AdminDashboardPage() {
             <li>Confirmer /api/agora/token pour la disponibilité RTC</li>
             <li>Tester un message IA Live sur /watch après chaque déploiement</li>
           </ul>
+        </section>
+
+        <section style={roleCardStyle}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <div>
+              <h2 style={{ margin: 0 }}>Gestion des rôles</h2>
+              <p style={{ margin: "6px 0 0", color: "#475569" }}>
+                Définissez les rôles <strong>super_admin</strong>, <strong>admin</strong> et <strong>agent</strong>.
+              </p>
+            </div>
+            <button type="button" onClick={() => void loadRoles()} style={action3DDarkStyle}>
+              Rafraîchir
+            </button>
+          </div>
+
+          <div style={{ fontSize: 13, color: "#1e3a8a", fontWeight: 700 }}>
+            Votre rôle actuel: {currentRole}
+          </div>
+
+          {loadingRoles ? <p style={{ margin: 0 }}>Chargement des utilisateurs...</p> : null}
+          {message ? <p style={{ color: "#15803d", margin: 0 }}>{message}</p> : null}
+          {error ? <p style={{ color: "#b91c1c", margin: 0 }}>Erreur: {error}</p> : null}
+
+          {!loadingRoles ? (
+            <div style={{ display: "grid", gap: 8 }}>
+              {roleUsers.map((item) => (
+                <article key={item.id} style={roleRowStyle}>
+                  <div style={{ display: "grid", gap: 4 }}>
+                    <strong>{item.email ?? item.id}</strong>
+                    <span style={{ fontSize: 12, color: "#64748b" }}>Rôle actuel: {item.role}</span>
+                  </div>
+
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                    <select
+                      value={draftRoles[item.id] ?? item.role}
+                      onChange={(event) =>
+                        setDraftRoles((prev) => ({ ...prev, [item.id]: event.target.value as AppRole }))
+                      }
+                      style={selectStyle}
+                    >
+                      {roleOptions.map((role) => (
+                        <option key={role} value={role}>
+                          {role}
+                        </option>
+                      ))}
+                    </select>
+
+                    <button
+                      type="button"
+                      onClick={() => void updateRole(item.id)}
+                      disabled={savingUserId === item.id}
+                      style={action3DPrimaryStyle}
+                    >
+                      {savingUserId === item.id ? "..." : "Appliquer"}
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : null}
         </section>
       </section>
     </main>
@@ -150,4 +305,32 @@ const statusBoxStyle: CSSProperties = {
   borderRadius: 12,
   background: "#f8fafc",
   padding: 12,
+};
+
+const roleCardStyle: CSSProperties = {
+  border: "1px solid #cbd5e1",
+  borderRadius: 12,
+  background: "#f8fafc",
+  padding: 12,
+  display: "grid",
+  gap: 10,
+};
+
+const roleRowStyle: CSSProperties = {
+  border: "1px solid #dbeafe",
+  borderRadius: 10,
+  background: "#fff",
+  padding: 10,
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: 10,
+  flexWrap: "wrap",
+};
+
+const selectStyle: CSSProperties = {
+  border: "1px solid #cbd5e1",
+  borderRadius: 10,
+  padding: "8px 10px",
+  fontWeight: 600,
 };
