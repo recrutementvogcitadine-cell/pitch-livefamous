@@ -93,6 +93,9 @@ export default async function CreatorProfilePage({ params }: { params: PageParam
         <section style={highlightCardStyle}>
           <h2 style={{ margin: 0 }}>En live maintenant 🔴</h2>
           <p style={{ margin: 0, color: "#334155" }}>{currentLive.title ?? "Live sans titre"}</p>
+          <Link href={`/watch?startLiveId=${encodeURIComponent(currentLive.id)}`} style={tapEntryStyle}>
+            Touchez ici pour entrer dans le live
+          </Link>
           <Link href={`/watch?startLiveId=${encodeURIComponent(currentLive.id)}`} style={primaryActionStyle}>
             Rejoindre ce live
           </Link>
@@ -185,6 +188,20 @@ const secondaryActionStyle = {
   color: "#0f172a",
   textDecoration: "none",
   fontWeight: 700,
+};
+
+const tapEntryStyle = {
+  display: "inline-flex",
+  width: "100%",
+  justifyContent: "center",
+  alignItems: "center",
+  borderRadius: 10,
+  padding: "12px 14px",
+  background: "#0f172a",
+  color: "#fff",
+  textDecoration: "none",
+  fontWeight: 800,
+  border: "1px solid rgba(255,255,255,0.2)",
 };
 
 const oldLiveItemStyle = {
