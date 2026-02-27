@@ -47,7 +47,6 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
   const [chatAuthor, setChatAuthor] = useState("@spectateur");
   const [chatSending, setChatSending] = useState(false);
   const chatInputRef = useRef<HTMLInputElement | null>(null);
-  const [noVideoHint, setNoVideoHint] = useState(false);
   const remoteVideoRef = useRef<HTMLDivElement | null>(null);
   const clientRef = useRef<AgoraClient | null>(null);
   const [isStandaloneIOS, setIsStandaloneIOS] = useState(false);
@@ -192,12 +191,12 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
           setStatus("Connecté. En attente de la vidéo...");
         } else if (active && !connected) {
           setVideoUnavailable(true);
-          setStatus("Vidéo indisponible pour ce live. Mode chat IA actif.");
+          setStatus("Mode chat IA actif.");
         }
       } catch {
         if (!active) return;
         setVideoUnavailable(true);
-        setStatus("Lecture vidéo indisponible. Utilise le chat IA en bas.");
+        setStatus("Mode chat IA actif.");
       }
     };
 
@@ -259,21 +258,6 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
       }
     };
   }, [resolvedId, supabaseClient]);
-
-  useEffect(() => {
-    if (hasVideo) {
-      setNoVideoHint(false);
-      return;
-    }
-
-    const timer = window.setTimeout(() => {
-      setNoVideoHint(true);
-    }, 9000);
-
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, [hasVideo, retryTick, resolvedId]);
 
   useEffect(() => {
     if (!resolvedId || !supabaseClient) return;
@@ -441,11 +425,6 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
                 {!safariOnlyMode ? (
                   <p style={{ margin: "0 0 12px", color: "#e2e8f0", fontSize: 13, lineHeight: 1.35 }}>
                     Ce live fonctionne sans caméra. Écris en bas pour discuter avec l'IA en direct.
-                  </p>
-                ) : null}
-                {noVideoHint && !safariOnlyMode ? (
-                  <p style={{ margin: "0 0 12px", color: "#bfdbfe", fontSize: 13, lineHeight: 1.35 }}>
-                    Aucun flux caméra actif pour le moment. Continue avec le chat en bas: l'IA peut répondre sans vidéo.
                   </p>
                 ) : null}
                 {safariOnlyMode ? (
