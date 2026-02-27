@@ -96,11 +96,17 @@ export default async function CreatorProfilePage({ params }: { params: PageParam
           <Link href={`/watch?startLiveId=${encodeURIComponent(currentLive.id)}`} style={primaryActionStyle}>
             Rejoindre ce live
           </Link>
+          <Link href="/watch" style={secondaryActionStyle}>
+            Ouvrir le flux live (scroll)
+          </Link>
         </section>
       ) : (
         <section style={cardStyle}>
           <h2 style={{ margin: 0 }}>Créateur hors ligne</h2>
           <p style={{ margin: 0, color: "#475569" }}>Ce créateur n&apos;est pas en live pour le moment.</p>
+          <Link href="/watch" style={secondaryActionStyle}>
+            Voir les lives en cours
+          </Link>
         </section>
       )}
 
