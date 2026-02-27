@@ -1,0 +1,722 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useMemo, useState, type CSSProperties, type UIEvent } from "react";
+import { createClient } from "@supabase/supabase-js";
+import { useAppLogo } from "../components/app-logo";
+
+type LiveRow = {
+  id: string;
+  title: string | null;
+  status: string | null;
+  created_at: string | null;
+  creator_id: string | null;
+  creator_verified?: boolean | null;
+  creator_is_certified?: boolean | null;
+  is_certified?: boolean | null;
+};
+
+type LiveAiMessage = {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  createdAt?: string;
+};
+
+type LiveAiAgent = {
+  id: string;
+  name: string;
+  gender: "male" | "female";
+};
+
+const PAGE_SIZE = 8;
+
+export default function WatchPage() {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [lives, setLives] = useState<LiveRow[]>([]);
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [likedByLive, setLikedByLive] = useState<Record<string, boolean>>({});
+  const [shareMessage, setShareMessage] = useState<string | null>(null);
+  const [aiPanelByLive, setAiPanelByLive] = useState<Record<string, boolean>>({});
+  const [aiInputByLive, setAiInputByLive] = useState<Record<string, string>>({});
+  const [aiLoadingByLive, setAiLoadingByLive] = useState<Record<string, boolean>>({});
+  const [aiMessagesByLive, setAiMessagesByLive] = useState<Record<string, LiveAiMessage[]>>({});
+  const [aiNoticeByLive, setAiNoticeByLive] = useState<Record<string, string>>({});
+  const [aiNextSendAtByLive, setAiNextSendAtByLive] = useState<Record<string, number>>({});
+  const [aiAgentByLive, setAiAgentByLive] = useState<Record<string, LiveAiAgent | null>>({});
+  const [aiActiveAgentsByLive, setAiActiveAgentsByLive] = useState<Record<string, LiveAiAgent[]>>({});
+  const appLogo = useAppLogo();
+
+  const client = useMemo(() => {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!url || !key) return null;
+    return createClient(url, key);
+  }, []);
+
+  const loadLives = async (nextOffset: number, append: boolean) => {
+    if (!client) return;
+    const { data, error: queryError } = await client
+      .from("lives")
+      .select("*")
+      .eq("status", "live")
+      .order("created_at", { ascending: false })
+      .range(nextOffset, nextOffset + PAGE_SIZE - 1);
+
+    if (queryError) throw queryError;
+
+    const rows = (data ?? []) as LiveRow[];
+    setLives((prev) => (append ? [...prev, ...rows] : rows));
+    setOffset(nextOffset + rows.length);
+    setHasMore(rows.length === PAGE_SIZE);
+  };
+
+  useEffect(() => {
+    const init = async () => {
+      setLoading(true);
+      setError(null);
+
+      if (!client) {
+        setError("Configuration Supabase manquante.");
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const { data } = await client.auth.getUser();
+        const user = data.user;
+        if (!user) {
+          window.location.href = "/auth";
+          return;
+        }
+
+        await loadLives(0, false);
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void init();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [client]);
+
+  const onReachEnd = async (event: UIEvent<HTMLDivElement>) => {
+    if (!hasMore || loading) return;
+    const target = event.currentTarget;
+    const nearBottom = target.scrollTop + target.clientHeight >= target.scrollHeight - 60;
+    if (!nearBottom) return;
+
+    try {
+      await loadLives(offset, true);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const toggleLike = (liveId: string) => {
+    setLikedByLive((prev) => ({ ...prev, [liveId]: !prev[liveId] }));
+  };
+
+  const shareLive = async (liveId: string) => {
+    const url = `${window.location.origin}/lives/${liveId}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "Famous AI Live", url });
+      } else {
+        await navigator.clipboard.writeText(url);
+      }
+      setShareMessage("Lien copié / partagé ✅");
+      window.setTimeout(() => setShareMessage(null), 1800);
+    } catch {
+      setShareMessage("Partage annulé");
+      window.setTimeout(() => setShareMessage(null), 1200);
+    }
+  };
+
+  const toggleAiPanel = async (liveId: string) => {
+    const nextOpen = !aiPanelByLive[liveId];
+    setAiPanelByLive((prev) => ({ ...prev, [liveId]: nextOpen }));
+    if (!nextOpen) return;
+
+    if (aiMessagesByLive[liveId]?.length) return;
+
+    try {
+      const response = await fetch(`/api/live-ai/reply?liveId=${encodeURIComponent(liveId)}`);
+      const body = (await response.json()) as { messages?: LiveAiMessage[]; activeAgents?: LiveAiAgent[] };
+      const remoteMessages = Array.isArray(body.messages) ? body.messages : [];
+
+      const initialActiveAgents = Array.isArray(body.activeAgents) ? body.activeAgents : [];
+      if (initialActiveAgents.length > 0) {
+        setAiActiveAgentsByLive((prev) => ({ ...prev, [liveId]: initialActiveAgents }));
+      }
+
+      if (remoteMessages.length) {
+        setAiMessagesByLive((prev) => ({ ...prev, [liveId]: remoteMessages }));
+        return;
+      }
+    } catch {}
+
+    setAiMessagesByLive((prev) => ({
+      ...prev,
+      [liveId]: [
+        {
+          id: `welcome-${liveId}`,
+          role: "assistant",
+          content: "Je suis un assistant virtuel IA en direct. Pose ta question.",
+        },
+      ],
+    }));
+  };
+
+  const sendAiMessage = async (liveId: string) => {
+    const text = (aiInputByLive[liveId] ?? "").trim();
+    const now = Date.now();
+    const nextSendAt = aiNextSendAtByLive[liveId] ?? 0;
+    if (!text || aiLoadingByLive[liveId]) return;
+
+    if (nextSendAt > now) {
+      const seconds = Math.max(1, Math.ceil((nextSendAt - now) / 1000));
+      setAiNoticeByLive((prev) => ({ ...prev, [liveId]: `Merci de patienter ${seconds}s avant le prochain message.` }));
+      return;
+    }
+
+    setAiNoticeByLive((prev) => ({ ...prev, [liveId]: "" }));
+
+    const userMessage: LiveAiMessage = {
+      id: `u-${Date.now()}`,
+      role: "user",
+      content: text,
+    };
+
+    const currentMessages = [...(aiMessagesByLive[liveId] ?? []), userMessage];
+    setAiMessagesByLive((prev) => ({ ...prev, [liveId]: currentMessages }));
+    setAiInputByLive((prev) => ({ ...prev, [liveId]: "" }));
+    setAiLoadingByLive((prev) => ({ ...prev, [liveId]: true }));
+
+    try {
+      const response = await fetch("/api/live-ai/reply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          liveId,
+          message: text,
+          history: currentMessages.map((item) => ({ role: item.role, content: item.content })),
+        }),
+      });
+
+      const body = (await response.json()) as {
+        reply?: string;
+        error?: string;
+        retryAfterMs?: number;
+        confidence?: number;
+        escalated?: boolean;
+        agent?: LiveAiAgent;
+        activeAgents?: LiveAiAgent[];
+        budget?: { ratio?: number; spentUsd?: number; limitUsd?: number; hardLimited?: boolean };
+      };
+      const assistantText =
+        response.ok && body.reply
+          ? body.reply
+          : "Je suis un assistant virtuel IA en direct. Je rencontre un souci temporaire, réessaie dans quelques secondes.";
+
+      const retryAfterMs = typeof body.retryAfterMs === "number" ? body.retryAfterMs : 0;
+
+      if (body.agent) {
+        setAiAgentByLive((prev) => ({ ...prev, [liveId]: body.agent ?? null }));
+      }
+
+      const nextActiveAgents = Array.isArray(body.activeAgents) ? body.activeAgents : [];
+      if (nextActiveAgents.length > 0) {
+        setAiActiveAgentsByLive((prev) => ({ ...prev, [liveId]: nextActiveAgents }));
+      }
+
+      if (retryAfterMs > 0) {
+        setAiNextSendAtByLive((prev) => ({ ...prev, [liveId]: Date.now() + retryAfterMs }));
+      } else {
+        setAiNextSendAtByLive((prev) => ({ ...prev, [liveId]: Date.now() + 1800 }));
+      }
+
+      if (!response.ok && response.status === 429) {
+        const seconds = Math.max(1, Math.ceil((retryAfterMs || 2000) / 1000));
+        setAiNoticeByLive((prev) => ({ ...prev, [liveId]: `Anti-spam actif: réessaie dans ${seconds}s.` }));
+      } else if (body.budget?.hardLimited) {
+        setAiNoticeByLive((prev) => ({
+          ...prev,
+          [liveId]: "Cap budget IA atteint: réponses réduites jusqu'au prochain cycle.",
+        }));
+      } else if (body.escalated) {
+        setAiNoticeByLive((prev) => ({
+          ...prev,
+          [liveId]: "Question transmise à un modérateur humain pour validation.",
+        }));
+      } else if (body.agent?.name) {
+        const activeAgentName = body.agent.name;
+        setAiNoticeByLive((prev) => ({
+          ...prev,
+          [liveId]: `Agent actif: ${activeAgentName}${body.budget?.ratio && body.budget.ratio >= 0.9 ? " (mode budget)" : ""}`,
+        }));
+      } else if (typeof body.confidence === "number" && body.confidence < 0.5) {
+        setAiNoticeByLive((prev) => ({
+          ...prev,
+          [liveId]: "Réponse IA prudente: vérification humaine recommandée.",
+        }));
+      }
+
+      setAiMessagesByLive((prev) => ({
+        ...prev,
+        [liveId]: [
+          ...(prev[liveId] ?? []),
+          {
+            id: `a-${Date.now()}`,
+            role: "assistant",
+            content: assistantText,
+          },
+        ],
+      }));
+    } catch {
+      setAiMessagesByLive((prev) => ({
+        ...prev,
+        [liveId]: [
+          ...(prev[liveId] ?? []),
+          {
+            id: `a-err-${Date.now()}`,
+            role: "assistant",
+            content:
+              "Je suis un assistant virtuel IA en direct. Réseau indisponible pour l'instant, réessaie bientôt.",
+          },
+        ],
+      }));
+    } finally {
+      setAiLoadingByLive((prev) => ({ ...prev, [liveId]: false }));
+    }
+  };
+
+  if (loading) {
+    return <main style={centerStyle}>Chargement du flux live…</main>;
+  }
+
+  if (error) {
+    return (
+      <main style={centerStyle}>
+        <p>Erreur: {error}</p>
+        <Link href="/auth" style={linkStyle}>
+          Retour connexion
+        </Link>
+      </main>
+    );
+  }
+
+  if (lives.length === 0) {
+    return (
+      <main style={centerStyle}>
+        <p>Aucun live en cours pour le moment.</p>
+        <Link href="/lives" style={linkStyle}>
+          Voir les derniers lives
+        </Link>
+      </main>
+    );
+  }
+
+  return (
+    <main style={{ height: "100vh", overflow: "hidden", background: "#000", fontFamily: "system-ui, sans-serif" }}>
+      <Link href="/" style={homeButtonStyle}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M3 10.5L12 3L21 10.5V20C21 20.5523 20.5523 21 20 21H14.5V14.5H9.5V21H4C3.44772 21 3 20.5523 3 20V10.5Z" fill="currentColor" />
+        </svg>
+        <span style={srOnlyStyle}>Accueil</span>
+      </Link>
+
+      <div
+        style={{
+          height: "100vh",
+          overflowY: "auto",
+          scrollSnapType: "y mandatory",
+          WebkitOverflowScrolling: "touch",
+        }}
+        onScroll={onReachEnd}
+      >
+        {lives.map((live) => (
+          <section key={live.id} style={slideStyle}>
+            <aside style={actionRailStyle}>
+              <button onClick={() => toggleLike(live.id)} style={actionBtnStyle} aria-label="Like">
+                {likedByLive[live.id] ? "❤️" : "🤍"}
+                <span style={actionTextStyle}>Like</span>
+              </button>
+              <Link href={`/lives/${live.id}`} style={actionBtnStyle} aria-label="Comment">
+                💬
+                <span style={actionTextStyle}>Comment</span>
+              </Link>
+              <button onClick={() => shareLive(live.id)} style={actionBtnStyle} aria-label="Share">
+                ↗️
+                <span style={actionTextStyle}>Share</span>
+              </button>
+              <button onClick={() => void toggleAiPanel(live.id)} style={actionBtnStyle} aria-label="AI Assistant">
+                🤖
+                <span style={actionTextStyle}>AI Live</span>
+              </button>
+            </aside>
+
+            <div style={overlayStyle}>
+              <img
+                src={appLogo}
+                alt="Logo app"
+                width={38}
+                height={38}
+                style={{ borderRadius: 10, border: "1px solid rgba(255,255,255,0.3)", background: "#fff" }}
+              />
+              <span style={badgeStyle}>EN DIRECT</span>
+              <span style={aiBadgeStyle}>Créateur virtuel IA</span>
+              <div style={{ margin: "8px 0 0", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <p style={{ margin: 0, opacity: 0.95, fontWeight: 700 }}>
+                  @{live.creator_id ? live.creator_id.slice(0, 8) : "createur"}
+                </p>
+                {isCreatorCertified(live) ? (
+                  <span style={verifiedBadgeStyle} title="Créateur certifié" aria-label="Créateur certifié">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path
+                        d="M12 2L14.7 4.2L18 4.4L18.8 7.6L21.4 9.6L20.4 12.8L21.4 16L18.8 18L18 21.2L14.7 21.4L12 23.6L9.3 21.4L6 21.2L5.2 18L2.6 16L3.6 12.8L2.6 9.6L5.2 7.6L6 4.4L9.3 4.2L12 2Z"
+                        fill="currentColor"
+                      />
+                      <path d="M8 12.4L10.5 14.9L16.2 9.2" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </span>
+                ) : null}
+              </div>
+              <h1 style={{ margin: "10px 0 6px", fontSize: 26 }}>{live.title || "Live sans titre"}</h1>
+              <p style={{ margin: 0, opacity: 0.9 }}>
+                {live.created_at ? new Date(live.created_at).toLocaleString("fr-FR") : "En cours"}
+              </p>
+              <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <Link href={`/lives/${live.id}`} style={actionStyle}>
+                  Ouvrir ce live
+                </Link>
+                <Link href="/lives" style={{ ...actionStyle, background: "rgba(255,255,255,0.18)" }}>
+                  Voir tous les lives
+                </Link>
+              </div>
+            </div>
+
+            {aiPanelByLive[live.id] ? (
+              <section style={aiPanelStyle}>
+                <div style={aiPanelHeaderStyle}>Q&A Live IA</div>
+                {aiAgentByLive[live.id]?.name ? (
+                  <div style={aiAgentStyle}>
+                    Agent actif: {aiAgentByLive[live.id]?.name} · {aiAgentByLive[live.id]?.gender === "female" ? "Femme" : "Homme"}
+                  </div>
+                ) : null}
+                {aiActiveAgentsByLive[live.id]?.length ? (
+                  <div style={aiRosterStyle}>Roster live: {aiActiveAgentsByLive[live.id].map((agent) => agent.name).join(" · ")}</div>
+                ) : null}
+                <div style={aiMessagesWrapStyle}>
+                  {(aiMessagesByLive[live.id] ?? []).map((item) => (
+                    <div
+                      key={item.id}
+                      style={{
+                        ...aiMessageStyle,
+                        alignSelf: item.role === "user" ? "flex-end" : "flex-start",
+                        background: item.role === "user" ? "#1d4ed8" : "rgba(30,41,59,0.9)",
+                      }}
+                    >
+                      {item.content}
+                    </div>
+                  ))}
+                </div>
+                {aiNoticeByLive[live.id] ? <div style={aiNoticeStyle}>{aiNoticeByLive[live.id]}</div> : null}
+                <div style={aiInputRowStyle}>
+                  <input
+                    value={aiInputByLive[live.id] ?? ""}
+                    onChange={(event) =>
+                      setAiInputByLive((prev) => ({ ...prev, [live.id]: event.target.value }))
+                    }
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        void sendAiMessage(live.id);
+                      }
+                    }}
+                    placeholder="Pose ta question en direct"
+                    style={aiInputStyle}
+                    maxLength={500}
+                  />
+                  <button
+                    onClick={() => void sendAiMessage(live.id)}
+                    style={aiSendStyle}
+                    disabled={Boolean(aiLoadingByLive[live.id])}
+                  >
+                    {aiLoadingByLive[live.id] ? "..." : "Envoyer"}
+                  </button>
+                </div>
+              </section>
+            ) : null}
+
+            {shareMessage ? <div style={shareToastStyle}>{shareMessage}</div> : null}
+          </section>
+        ))}
+
+        {!hasMore ? (
+          <section style={{ ...slideStyle, alignItems: "center", justifyContent: "center" }}>
+            <div style={{ color: "#fff", opacity: 0.8 }}>Fin du flux pour le moment</div>
+          </section>
+        ) : null}
+      </div>
+    </main>
+  );
+}
+
+const centerStyle: CSSProperties = {
+  minHeight: "100vh",
+  display: "grid",
+  placeItems: "center",
+  padding: 24,
+  background: "#020617",
+  color: "#fff",
+  textAlign: "center",
+};
+
+const slideStyle: CSSProperties = {
+  height: "100vh",
+  scrollSnapAlign: "start",
+  scrollSnapStop: "always",
+  position: "relative",
+  display: "flex",
+  alignItems: "flex-end",
+  justifyContent: "flex-start",
+  padding: 20,
+  background:
+    "radial-gradient(circle at 20% 20%, #1d4ed8 0%, #0f172a 40%, #020617 100%)",
+  color: "#fff",
+};
+
+const overlayStyle: CSSProperties = {
+  width: "100%",
+  maxWidth: 560,
+  borderRadius: 14,
+  padding: 14,
+  background: "rgba(15, 23, 42, 0.55)",
+  backdropFilter: "blur(4px)",
+};
+
+const badgeStyle: CSSProperties = {
+  display: "inline-block",
+  borderRadius: 999,
+  background: "#dc2626",
+  color: "#fff",
+  padding: "4px 10px",
+  fontSize: 12,
+  fontWeight: 700,
+};
+
+const aiBadgeStyle: CSSProperties = {
+  display: "inline-block",
+  borderRadius: 999,
+  background: "#2563eb",
+  color: "#fff",
+  padding: "4px 10px",
+  fontSize: 12,
+  fontWeight: 700,
+  marginLeft: 8,
+};
+
+const verifiedBadgeStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  width: 22,
+  height: 22,
+  borderRadius: 999,
+  color: "#3b82f6",
+  background: "#2563eb",
+  border: "1px solid rgba(255,255,255,0.25)",
+  boxShadow: "0 4px 10px rgba(37,99,235,0.45)",
+};
+
+const actionStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: 10,
+  padding: "10px 12px",
+  color: "#fff",
+  textDecoration: "none",
+  background: "#2563eb",
+  fontWeight: 700,
+};
+
+const linkStyle: CSSProperties = {
+  color: "#93c5fd",
+  textDecoration: "none",
+  fontWeight: 700,
+};
+
+const homeButtonStyle: CSSProperties = {
+  position: "fixed",
+  left: 14,
+  bottom: 18,
+  zIndex: 20,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: 999,
+  width: 46,
+  height: 46,
+  color: "#fff",
+  background: "rgba(15, 23, 42, 0.78)",
+  border: "1px solid rgba(255,255,255,0.22)",
+  textDecoration: "none",
+  boxShadow: "0 8px 18px rgba(0,0,0,0.35)",
+  backdropFilter: "blur(5px)",
+};
+
+const actionRailStyle: CSSProperties = {
+  position: "absolute",
+  right: 12,
+  bottom: 120,
+  zIndex: 9,
+  display: "grid",
+  gap: 10,
+};
+
+const actionBtnStyle: CSSProperties = {
+  width: 64,
+  height: 64,
+  borderRadius: 999,
+  border: "1px solid rgba(255,255,255,0.25)",
+  background: "rgba(15, 23, 42, 0.7)",
+  color: "#fff",
+  display: "inline-flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 2,
+  textDecoration: "none",
+  fontSize: 18,
+  cursor: "pointer",
+};
+
+const actionTextStyle: CSSProperties = {
+  fontSize: 11,
+  fontWeight: 700,
+  lineHeight: 1,
+};
+
+const shareToastStyle: CSSProperties = {
+  position: "absolute",
+  bottom: 80,
+  left: "50%",
+  transform: "translateX(-50%)",
+  background: "rgba(15,23,42,0.8)",
+  color: "#fff",
+  padding: "8px 12px",
+  borderRadius: 999,
+  fontSize: 13,
+  fontWeight: 700,
+};
+
+const aiPanelStyle: CSSProperties = {
+  position: "absolute",
+  right: 88,
+  bottom: 24,
+  width: 320,
+  maxWidth: "calc(100vw - 130px)",
+  maxHeight: "58vh",
+  borderRadius: 12,
+  background: "rgba(2,6,23,0.88)",
+  border: "1px solid rgba(148,163,184,0.35)",
+  display: "grid",
+  gridTemplateRows: "auto 1fr auto",
+  overflow: "hidden",
+  backdropFilter: "blur(4px)",
+};
+
+const aiPanelHeaderStyle: CSSProperties = {
+  padding: "10px 12px",
+  color: "#fff",
+  fontWeight: 700,
+  borderBottom: "1px solid rgba(148,163,184,0.25)",
+  fontSize: 13,
+};
+
+const aiMessagesWrapStyle: CSSProperties = {
+  padding: 10,
+  display: "flex",
+  flexDirection: "column",
+  gap: 8,
+  overflowY: "auto",
+};
+
+const aiMessageStyle: CSSProperties = {
+  maxWidth: "90%",
+  color: "#fff",
+  borderRadius: 10,
+  padding: "8px 10px",
+  fontSize: 13,
+  lineHeight: 1.35,
+};
+
+const aiInputRowStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1fr auto",
+  gap: 8,
+  padding: 10,
+  borderTop: "1px solid rgba(148,163,184,0.25)",
+};
+
+const aiNoticeStyle: CSSProperties = {
+  padding: "0 10px 8px",
+  color: "#fcd34d",
+  fontSize: 12,
+  fontWeight: 600,
+};
+
+const aiAgentStyle: CSSProperties = {
+  padding: "8px 10px 0",
+  color: "#93c5fd",
+  fontSize: 12,
+  fontWeight: 700,
+};
+
+const aiRosterStyle: CSSProperties = {
+  padding: "2px 10px 6px",
+  color: "#cbd5e1",
+  fontSize: 11,
+  opacity: 0.95,
+};
+
+const aiInputStyle: CSSProperties = {
+  border: "1px solid rgba(148,163,184,0.4)",
+  borderRadius: 10,
+  padding: "8px 10px",
+  background: "rgba(15,23,42,0.85)",
+  color: "#fff",
+  fontSize: 13,
+};
+
+const aiSendStyle: CSSProperties = {
+  border: "none",
+  borderRadius: 10,
+  padding: "8px 11px",
+  background: "#2563eb",
+  color: "#fff",
+  fontWeight: 700,
+  cursor: "pointer",
+};
+
+const srOnlyStyle: CSSProperties = {
+  position: "absolute",
+  width: 1,
+  height: 1,
+  padding: 0,
+  margin: -1,
+  overflow: "hidden",
+  clip: "rect(0, 0, 0, 0)",
+  whiteSpace: "nowrap",
+  border: 0,
+};
+
+function isCreatorCertified(live: LiveRow) {
+  return Boolean(live.creator_verified || live.creator_is_certified || live.is_certified);
+}

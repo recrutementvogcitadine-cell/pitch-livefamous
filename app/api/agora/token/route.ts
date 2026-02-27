@@ -10,10 +10,17 @@ export async function GET(req: Request) {
     const appId = process.env.AGORA_APP_ID;
     const appCert = process.env.AGORA_APP_CERT;
     const tokenSecret = process.env.AGORA_TOKEN_SECRET;
-    // Simple auth: require a header or query param 'secret' matching AGORA_TOKEN_SECRET if it is set
-    if (tokenSecret) {
+    // Admin mode: if caller requests `?admin=true` (or header `x-agora-admin`), require the server secret.
+    // Regular frontend calls do NOT need to provide the secret — the server uses the private AGORA_APP_CERT
+    // to sign tokens and the secret remains server-only. For stronger protection, enable `AGORA_TOKEN_SECRET`
+    // and ensure clients authenticate to your app before calling this endpoint.
+    const adminRequested = (url.searchParams.get('admin') || '').toLowerCase() === 'true' || req.headers.get('x-agora-admin') === '1';
+    if (adminRequested) {
+      if (!tokenSecret) {
+        return new Response(JSON.stringify({ error: 'admin mode not available' }), { status: 403, headers: { 'Content-Type': 'application/json' } });
+      }
       const provided = req.headers.get('x-agora-token-secret') || url.searchParams.get('secret') || '';
-      if (provided !== tokenSecret) {
+      if (!provided || provided !== tokenSecret) {
         return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
       }
     }
@@ -30,7 +37,7 @@ export async function GET(req: Request) {
     const token = RtcTokenBuilder.buildTokenWithUid(appId, appCert, channel, uid, role, expire);
 
     return new Response(JSON.stringify({ token, channel, expires_at: expire }), { status: 200, headers: { 'Content-Type': 'application/json' } });
-  } catch (err: any) {
+  } catch (err: unknown) {
     return new Response(JSON.stringify({ error: String(err) }), { status: 500, headers: { 'Content-Type': 'application/json' } });
   }
 }

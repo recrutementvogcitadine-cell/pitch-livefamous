@@ -17,7 +17,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
           cache: 'npm'
       - name: Install
         run: npm ci
@@ -56,7 +56,7 @@ jobs:
   deploy-ssh:
     needs: publish-image
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && secrets.DEPLOY_HOST
+    if: github.ref == 'refs/heads/main'
     steps:
       - name: Deploy via SSH and Docker
         uses: appleboy/ssh-action@v0.1.7

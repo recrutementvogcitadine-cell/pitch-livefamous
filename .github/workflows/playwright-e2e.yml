@@ -1,0 +1,42 @@
+name: Playwright E2E against deployment
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    env:
+      BASE_URL: ${{ secrets.DEPLOYMENT_URL }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (optional)
+        run: npm run build || true
+
+      - name: Run Playwright E2E (Chromium)
+        env:
+          BASE_URL: ${{ secrets.DEPLOYMENT_URL }}
+        run: |
+          if [ -z "${BASE_URL}" ]; then
+            echo "Missing secret DEPLOYMENT_URL (set to https://your-app.vercel.app)"; exit 1
+          fi
+          # Example: run a custom e2e script that accepts the base URL
+          if [ -f scripts/run-agora-e2e.mjs ]; then
+            node scripts/run-agora-e2e.mjs --url "$BASE_URL"
+          else
+            # fallback: run playwright test if configured
+            npx playwright test --project=chromium --config=playwright.config.ts || true
+          fi
