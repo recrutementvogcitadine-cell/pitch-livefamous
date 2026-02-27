@@ -47,12 +47,33 @@ type ButtonLabelSettings = {
   error?: string;
 };
 
-const actionItems = [
+type ActionShortcut = {
+  href: string;
+  label: string;
+  tone?: "primary" | "dark";
+};
+
+type DashboardActionItem = {
+  href: string;
+  title: string;
+  description: string;
+  tone: "primary" | "dark";
+  shortcuts?: ActionShortcut[];
+};
+
+const actionItems: DashboardActionItem[] = [
   {
     href: "/settings/moderation",
     title: "Modération IA",
     description: "Gérer les escalades humaines et le traitement des incidents IA.",
     tone: "primary" as const,
+    shortcuts: [
+      { href: "/settings/moderation", label: "Ouvrir modération", tone: "primary" },
+      { href: "/watch", label: "Watch live", tone: "dark" },
+      { href: "/lives", label: "Tous les lives", tone: "dark" },
+      { href: "/api/live-ai/escalations?status=open", label: "API escalades ouvertes", tone: "dark" },
+      { href: "/api/live-ai/escalations?status=resolved", label: "API escalades résolues", tone: "dark" },
+    ],
   },
   {
     href: "/lives",
@@ -417,6 +438,19 @@ export default function AdminDashboardPage() {
               <Link href={item.href} style={item.tone === "primary" ? action3DPrimaryStyle : action3DDarkStyle}>
                 Ouvrir
               </Link>
+              {item.shortcuts?.length ? (
+                <div style={shortcutGridStyle}>
+                  {item.shortcuts.map((shortcut) => (
+                    <Link
+                      key={`${item.title}-${shortcut.href}-${shortcut.label}`}
+                      href={shortcut.href}
+                      style={shortcut.tone === "primary" ? shortcutPrimaryStyle : shortcutDarkStyle}
+                    >
+                      {shortcut.label}
+                    </Link>
+                  ))}
+                </div>
+              ) : null}
             </article>
           ))}
         </section>
@@ -756,6 +790,35 @@ const panelStyle: CSSProperties = {
   padding: 14,
   display: "grid",
   gap: 10,
+};
+
+const shortcutGridStyle: CSSProperties = {
+  display: "grid",
+  gap: 8,
+  gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
+};
+
+const shortcutBaseStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: 10,
+  padding: "8px 10px",
+  fontWeight: 700,
+  textDecoration: "none",
+  fontSize: 12,
+};
+
+const shortcutPrimaryStyle: CSSProperties = {
+  ...shortcutBaseStyle,
+  background: "#1d4ed8",
+  color: "#fff",
+};
+
+const shortcutDarkStyle: CSSProperties = {
+  ...shortcutBaseStyle,
+  background: "#0f172a",
+  color: "#fff",
 };
 
 const action3DBaseStyle: CSSProperties = {
