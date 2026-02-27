@@ -5,15 +5,55 @@ import { createClient as createUserClient } from "@/lib/supabase/server";
 const DEFAULT_LIMIT = 8;
 const MAX_LIMIT = 30;
 
+async function getAuthenticatedUser(req: Request) {
+  const userClient = await createUserClient();
+  const {
+    data: { user: cookieUser },
+  } = await userClient.auth.getUser();
+
+  if (cookieUser) {
+    return { user: cookieUser, error: null as string | null };
+  }
+
+  const authHeader = req.headers.get("authorization") ?? req.headers.get("Authorization") ?? "";
+  const bearerToken = authHeader.toLowerCase().startsWith("bearer ") ? authHeader.slice(7).trim() : "";
+
+  if (!bearerToken) {
+    return { user: null, error: "unauthorized" };
+  }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !anonKey) {
+    return { user: null, error: "supabase anon env missing" };
+  }
+
+  const anonClient = createSupabaseClient(supabaseUrl, anonKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
+
+  const {
+    data: { user: bearerUser },
+  } = await anonClient.auth.getUser(bearerToken);
+
+  if (!bearerUser) {
+    return { user: null, error: "unauthorized" };
+  }
+
+  return { user: bearerUser, error: null as string | null };
+}
+
 export async function GET(req: Request) {
   try {
-    const userClient = await createUserClient();
-    const {
-      data: { user },
-    } = await userClient.auth.getUser();
+    const { user, error: authError } = await getAuthenticatedUser(req);
 
     if (!user) {
-      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+      const status = authError === "supabase anon env missing" ? 500 : 401;
+      return NextResponse.json({ error: authError ?? "unauthorized" }, { status });
     }
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;

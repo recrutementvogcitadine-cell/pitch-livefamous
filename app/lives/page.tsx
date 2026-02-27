@@ -30,10 +30,23 @@ export default function LivesPage() {
     return createClient(url, key);
   }, []);
 
+  const getAuthHeaders = async (): Promise<Record<string, string>> => {
+    if (!client) return {};
+
+    const {
+      data: { session },
+    } = await client.auth.getSession();
+
+    if (!session?.access_token) return {};
+
+    return { Authorization: `Bearer ${session.access_token}` };
+  };
+
   const loadPage = async (nextOffset: number, append: boolean, liveOnly: boolean) => {
+    const authHeaders = await getAuthHeaders();
     const response = await fetch(
       `/api/lives/feed?offset=${encodeURIComponent(String(nextOffset))}&limit=${encodeURIComponent(String(PAGE_SIZE))}&liveOnly=${liveOnly ? "true" : "false"}`,
-      { cache: "no-store" }
+      { cache: "no-store", headers: authHeaders }
     );
 
     if (response.status === 401) {

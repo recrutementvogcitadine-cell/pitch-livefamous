@@ -17,5 +17,10 @@ declare namespace NodeJS {
     LIVE_AI_MONTHLY_BUDGET_USD?: string;
     LIVE_AI_MODERATOR_EMAILS?: string;
     SUPER_ADMIN_EMAILS?: string;
+    NEXT_PUBLIC_APP_URL?: string;
+    NEXT_PUBLIC_VAPID_PUBLIC_KEY?: string;
+    VAPID_PUBLIC_KEY?: string;
+    VAPID_PRIVATE_KEY?: string;
+    VAPID_SUBJECT?: string;
   }
 }

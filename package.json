@@ -13,11 +13,12 @@
     "dependencies": {
         "@supabase/ssr": "^0.8.0",
         "@supabase/supabase-js": "^2.97.0",
-        "agora-rtc-sdk-ng": "^4.9.0",
         "agora-access-token": "*",
+        "agora-rtc-sdk-ng": "^4.9.0",
         "next": "16.1.6",
         "react": "19.2.3",
-        "react-dom": "19.2.3"
+        "react-dom": "19.2.3",
+        "web-push": "^3.6.7"
     },
     "devDependencies": {
         "@ffmpeg-installer/ffmpeg": "^1.1.0",
@@ -25,6 +26,7 @@
         "@types/node": "^20",
         "@types/react": "^19",
         "@types/react-dom": "^19",
+        "@types/web-push": "^3.6.4",
         "babel-plugin-react-compiler": "1.0.0",
         "eslint": "^9",
         "eslint-config-next": "16.1.6",

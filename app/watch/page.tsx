@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, type CSSProperties, type UIEvent } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { useAppLogo } from "../components/app-logo";
+import LiveNotificationControls from "../components/LiveNotificationControls";
 
 type LiveRow = {
   id: string;
@@ -48,6 +49,11 @@ export default function WatchPage() {
   const [aiAgentByLive, setAiAgentByLive] = useState<Record<string, LiveAiAgent | null>>({});
   const [aiActiveAgentsByLive, setAiActiveAgentsByLive] = useState<Record<string, LiveAiAgent[]>>({});
   const [signingOut, setSigningOut] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [followingByCreator, setFollowingByCreator] = useState<Record<string, boolean>>({});
+  const [followLoadingByCreator, setFollowLoadingByCreator] = useState<Record<string, boolean>>({});
+  const [notifyByLive, setNotifyByLive] = useState<Record<string, string>>({});
+  const [notifyLoadingByLive, setNotifyLoadingByLive] = useState<Record<string, boolean>>({});
   const appLogo = useAppLogo();
 
   const client = useMemo(() => {
@@ -58,9 +64,10 @@ export default function WatchPage() {
   }, []);
 
   const loadLives = async (nextOffset: number, append: boolean) => {
+    const authHeaders = await getAuthHeaders();
     const response = await fetch(
       `/api/lives/feed?offset=${encodeURIComponent(String(nextOffset))}&limit=${encodeURIComponent(String(PAGE_SIZE))}`,
-      { cache: "no-store" }
+      { cache: "no-store", headers: authHeaders }
     );
 
     if (response.status === 401) {
@@ -97,6 +104,46 @@ export default function WatchPage() {
     void init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!client) return;
+
+    const loadAuthContext = async () => {
+      const {
+        data: { user },
+      } = await client.auth.getUser();
+
+      setCurrentUserId(user?.id ?? null);
+    };
+
+    void loadAuthContext();
+  }, [client]);
+
+  useEffect(() => {
+    const creatorIds = Array.from(new Set(lives.map((live) => live.creator_id).filter((id): id is string => Boolean(id))));
+    if (creatorIds.length === 0) return;
+
+    const loadFollowState = async () => {
+      try {
+        const authHeaders = await getAuthHeaders();
+        const response = await fetch(`/api/live-notify/follow?creators=${encodeURIComponent(creatorIds.join(","))}`, {
+          cache: "no-store",
+          headers: authHeaders,
+        });
+
+        if (!response.ok) return;
+
+        const body = (await response.json()) as { followedCreatorIds?: string[] };
+        const nextMap: Record<string, boolean> = {};
+        for (const creatorId of body.followedCreatorIds ?? []) {
+          nextMap[creatorId] = true;
+        }
+        setFollowingByCreator((prev) => ({ ...prev, ...nextMap }));
+      } catch {}
+    };
+
+    void loadFollowState();
+  }, [lives]);
 
   const onReachEnd = async (event: UIEvent<HTMLDivElement>) => {
     if (!hasMore || loading) return;
@@ -305,6 +352,64 @@ export default function WatchPage() {
     }
   };
 
+  const toggleFollow = async (creatorId: string | null) => {
+    if (!creatorId || !currentUserId || creatorId === currentUserId) return;
+
+    const current = Boolean(followingByCreator[creatorId]);
+    setFollowLoadingByCreator((prev) => ({ ...prev, [creatorId]: true }));
+
+    try {
+      const authHeaders = await getAuthHeaders();
+      const response = await fetch("/api/live-notify/follow", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders },
+        body: JSON.stringify({ creatorId, follow: !current }),
+      });
+
+      const body = (await response.json()) as { ok?: boolean; following?: boolean; error?: string };
+      if (!response.ok || !body.ok) {
+        throw new Error(body.error ?? "action impossible");
+      }
+
+      setFollowingByCreator((prev) => ({ ...prev, [creatorId]: Boolean(body.following) }));
+    } catch (err: unknown) {
+      setShareMessage(`Erreur follow: ${toDisplayErrorMessage(err)}`);
+      window.setTimeout(() => setShareMessage(null), 2200);
+    } finally {
+      setFollowLoadingByCreator((prev) => ({ ...prev, [creatorId]: false }));
+    }
+  };
+
+  const notifyFollowers = async (live: LiveRow) => {
+    if (!live.id || !currentUserId || live.creator_id !== currentUserId) return;
+
+    setNotifyLoadingByLive((prev) => ({ ...prev, [live.id]: true }));
+    setNotifyByLive((prev) => ({ ...prev, [live.id]: "" }));
+
+    try {
+      const authHeaders = await getAuthHeaders();
+      const response = await fetch("/api/live-notify/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders },
+        body: JSON.stringify({ liveId: live.id, title: live.title ?? "Live en direct" }),
+      });
+
+      const body = (await response.json()) as { ok?: boolean; sent?: number; followers?: number; error?: string };
+      if (!response.ok || !body.ok) {
+        throw new Error(body.error ?? "notification impossible");
+      }
+
+      setNotifyByLive((prev) => ({
+        ...prev,
+        [live.id]: `Notifications envoyées: ${body.sent ?? 0}/${body.followers ?? 0}`,
+      }));
+    } catch (err: unknown) {
+      setNotifyByLive((prev) => ({ ...prev, [live.id]: `Erreur: ${toDisplayErrorMessage(err)}` }));
+    } finally {
+      setNotifyLoadingByLive((prev) => ({ ...prev, [live.id]: false }));
+    }
+  };
+
   const onSignOut = async () => {
     if (!client || signingOut) return;
     setSigningOut(true);
@@ -420,6 +525,36 @@ export default function WatchPage() {
                 <Link href="/lives" style={{ ...actionStyle, background: "rgba(255,255,255,0.18)" }}>
                   Voir tous les lives
                 </Link>
+                {live.creator_id && live.creator_id !== currentUserId ? (
+                  <button
+                    type="button"
+                    onClick={() => void toggleFollow(live.creator_id)}
+                    disabled={Boolean(followLoadingByCreator[live.creator_id])}
+                    style={inlineActionButtonStyle}
+                  >
+                    {followLoadingByCreator[live.creator_id]
+                      ? "..."
+                      : followingByCreator[live.creator_id]
+                        ? "Ne plus suivre"
+                        : "Suivre"}
+                  </button>
+                ) : null}
+                {live.creator_id && live.creator_id === currentUserId ? (
+                  <button
+                    type="button"
+                    onClick={() => void notifyFollowers(live)}
+                    disabled={Boolean(notifyLoadingByLive[live.id])}
+                    style={inlineActionButtonStyle}
+                  >
+                    {notifyLoadingByLive[live.id] ? "Envoi..." : "Notifier mes followers"}
+                  </button>
+                ) : null}
+              </div>
+              {live.creator_id && live.creator_id === currentUserId && notifyByLive[live.id] ? (
+                <p style={{ margin: "8px 0 0", fontSize: 13, opacity: 0.92 }}>{notifyByLive[live.id]}</p>
+              ) : null}
+              <div style={{ marginTop: 10 }}>
+                <LiveNotificationControls />
               </div>
             </div>
 
@@ -567,6 +702,16 @@ const actionStyle: CSSProperties = {
   textDecoration: "none",
   background: "#2563eb",
   fontWeight: 700,
+};
+
+const inlineActionButtonStyle: CSSProperties = {
+  border: "1px solid rgba(255,255,255,0.35)",
+  borderRadius: 999,
+  padding: "9px 12px",
+  background: "rgba(255,255,255,0.16)",
+  color: "#fff",
+  fontWeight: 700,
+  cursor: "pointer",
 };
 
 const linkStyle: CSSProperties = {
