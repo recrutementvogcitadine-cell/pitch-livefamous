@@ -26,6 +26,8 @@ export async function GET(req: Request) {
     const url = new URL(req.url);
     const offsetParam = Number(url.searchParams.get("offset") ?? "0");
     const limitParam = Number(url.searchParams.get("limit") ?? String(DEFAULT_LIMIT));
+    const liveOnlyParam = (url.searchParams.get("liveOnly") ?? "true").toLowerCase();
+    const liveOnly = liveOnlyParam !== "false";
     const offset = Number.isFinite(offsetParam) && offsetParam >= 0 ? Math.floor(offsetParam) : 0;
     const requestedLimit = Number.isFinite(limitParam) && limitParam > 0 ? Math.floor(limitParam) : DEFAULT_LIMIT;
     const limit = Math.min(requestedLimit, MAX_LIMIT);
@@ -37,18 +39,23 @@ export async function GET(req: Request) {
       },
     });
 
-    const { data, error } = await adminClient
+    let query = adminClient
       .from("lives")
       .select("id, title, status, created_at, creator_id, creator_verified, creator_is_certified, is_certified")
-      .eq("status", "live")
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);
+
+    if (liveOnly) {
+      query = query.eq("status", "live");
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ rows: data ?? [] }, { status: 200 });
+    return NextResponse.json({ rows: data ?? [], liveOnly }, { status: 200 });
   } catch (error: unknown) {
     return NextResponse.json({ error: String(error) }, { status: 500 });
   }

@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
-import { createClient } from "@supabase/supabase-js";
+import { useEffect, useState, type CSSProperties } from "react";
 
 type LiveRow = {
   id: string;
@@ -22,27 +21,24 @@ export default function LivesPage() {
   const [hasMore, setHasMore] = useState(true);
   const [showingLiveOnly, setShowingLiveOnly] = useState(true);
 
-  const client = useMemo(() => {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    if (!url || !key) return null;
-    return createClient(url, key);
-  }, []);
-
   const loadPage = async (nextOffset: number, append: boolean, liveOnly: boolean) => {
-    if (!client) return 0;
+    const response = await fetch(
+      `/api/lives/feed?offset=${encodeURIComponent(String(nextOffset))}&limit=${encodeURIComponent(String(PAGE_SIZE))}&liveOnly=${liveOnly ? "true" : "false"}`,
+      { cache: "no-store" }
+    );
 
-    const query = client
-      .from("lives")
-      .select("id,title,status,created_at")
-      .order("created_at", { ascending: false })
-      .range(nextOffset, nextOffset + PAGE_SIZE - 1);
+    if (response.status === 401) {
+      window.location.href = "/auth";
+      return 0;
+    }
 
-    const { data, error: queryError } = liveOnly ? await query.eq("status", "live") : await query;
+    const body = (await response.json()) as { rows?: LiveRow[]; error?: string };
 
-    if (queryError) throw queryError;
+    if (!response.ok) {
+      throw new Error(body.error ?? "lives fetch failed");
+    }
 
-    const rows = (data ?? []) as LiveRow[];
+    const rows = Array.isArray(body.rows) ? body.rows : [];
     setLives((prev) => (append ? [...prev, ...rows] : rows));
     setOffset(nextOffset + rows.length);
     setHasMore(rows.length === PAGE_SIZE);
@@ -55,19 +51,13 @@ export default function LivesPage() {
       setLoading(true);
       setError(null);
 
-      if (!client) {
-        setError("Variables Supabase manquantes.");
-        setLoading(false);
-        return;
-      }
-
       try {
         const liveCount = await loadPage(0, false, true);
         if (liveCount === 0) {
           await loadPage(0, false, false);
         }
       } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : String(err));
+        setError(toDisplayErrorMessage(err));
       } finally {
         setLoading(false);
       }
@@ -75,16 +65,16 @@ export default function LivesPage() {
 
     void init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [client]);
+  }, []);
 
   const loadMore = async () => {
-    if (!client || loadingMore || !hasMore) return;
+    if (loadingMore || !hasMore) return;
     setLoadingMore(true);
     setError(null);
     try {
       await loadPage(offset, true, showingLiveOnly);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(toDisplayErrorMessage(err));
     } finally {
       setLoadingMore(false);
     }
@@ -177,3 +167,39 @@ const pillStyleButton: CSSProperties = {
   ...pillStyle,
   cursor: "pointer",
 };
+
+function toDisplayErrorMessage(err: unknown): string {
+  if (err instanceof Error) {
+    return err.message;
+  }
+
+  if (typeof err === "string") {
+    return err;
+  }
+
+  if (err && typeof err === "object") {
+    const message = Reflect.get(err, "message");
+    if (typeof message === "string" && message.trim().length > 0) {
+      return message;
+    }
+
+    const errorDescription = Reflect.get(err, "error_description");
+    if (typeof errorDescription === "string" && errorDescription.trim().length > 0) {
+      return errorDescription;
+    }
+
+    const error = Reflect.get(err, "error");
+    if (typeof error === "string" && error.trim().length > 0) {
+      return error;
+    }
+
+    try {
+      const serialized = JSON.stringify(err);
+      if (serialized && serialized !== "{}") {
+        return serialized;
+      }
+    } catch {}
+  }
+
+  return "Erreur de chargement des lives.";
+}
