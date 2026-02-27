@@ -567,7 +567,7 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
 
         @media (max-width: 640px) {
           .live-video-shell {
-            height: calc(100vh - 64px - env(safe-area-inset-bottom, 0px) - 10px);
+            height: calc(100vh - 64px - env(safe-area-inset-bottom, 0px) - 12px);
           }
         }
       `}</style>
