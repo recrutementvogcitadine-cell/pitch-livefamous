@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { createClient } from "@supabase/supabase-js";
 
 type AgoraTrack = {
   play: (element?: HTMLElement | string) => void;
@@ -26,6 +27,13 @@ type AgoraSDK = {
 
 type PageParams = { id?: string } | Promise<{ id?: string }>;
 
+type LiveChatMessage = {
+  id: string;
+  text: string;
+  author: string;
+  createdAt: number;
+};
+
 export default function LiveViewerPage({ params }: { params: PageParams }) {
   const [status, setStatus] = useState("Connexion au live...");
   const [resolvedId, setResolvedId] = useState("");
@@ -33,10 +41,22 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
   const [liked, setLiked] = useState(false);
   const [shareMessage, setShareMessage] = useState<string | null>(null);
   const [retryTick, setRetryTick] = useState(0);
+  const [chatInput, setChatInput] = useState("");
+  const [chatMessages, setChatMessages] = useState<LiveChatMessage[]>([]);
+  const [chatAuthor, setChatAuthor] = useState("@spectateur");
+  const [chatSending, setChatSending] = useState(false);
   const remoteVideoRef = useRef<HTMLDivElement | null>(null);
   const clientRef = useRef<AgoraClient | null>(null);
   const [isStandaloneIOS, setIsStandaloneIOS] = useState(false);
   const [safariOnlyMode, setSafariOnlyMode] = useState(false);
+  const chatChannelRef = useRef<ReturnType<NonNullable<ReturnType<typeof createClient>["channel"]>> | null>(null);
+
+  const supabaseClient = (() => {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!url || !anonKey) return null;
+    return createClient(url, anonKey);
+  })();
 
   useEffect(() => {
     let active = true;
@@ -186,6 +206,51 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
     };
   }, [params, retryTick]);
 
+  useEffect(() => {
+    if (!resolvedId || !supabaseClient) return;
+
+    let isMounted = true;
+
+    const hydrateAuthor = async () => {
+      try {
+        const {
+          data: { user },
+        } = await supabaseClient.auth.getUser();
+        if (!isMounted) return;
+        if (user?.id) {
+          setChatAuthor(`@${user.id.slice(0, 8)}`);
+        }
+      } catch {}
+    };
+
+    void hydrateAuthor();
+
+    const channelName = `live-chat-${resolvedId}`;
+    const channel = supabaseClient.channel(channelName, {
+      config: { broadcast: { self: true } },
+    });
+
+    channel.on("broadcast", { event: "chat-message" }, (payload) => {
+      const message = payload.payload as LiveChatMessage;
+      if (!message || typeof message.text !== "string" || !message.text.trim()) return;
+      setChatMessages((prev) => {
+        const next = [...prev, message];
+        return next.slice(-30);
+      });
+    });
+
+    channel.subscribe();
+    chatChannelRef.current = channel;
+
+    return () => {
+      isMounted = false;
+      if (chatChannelRef.current) {
+        void supabaseClient.removeChannel(chatChannelRef.current);
+        chatChannelRef.current = null;
+      }
+    };
+  }, [resolvedId, supabaseClient]);
+
   const openInSafari = () => {
     if (typeof window === "undefined") return;
     const current = `${window.location.origin}${window.location.pathname}`;
@@ -206,6 +271,30 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
     } catch {
       setShareMessage("Partage annulé");
       window.setTimeout(() => setShareMessage(null), 1200);
+    }
+  };
+
+  const sendChatMessage = async () => {
+    const text = chatInput.trim();
+    if (!text || !chatChannelRef.current || chatSending) return;
+    setChatSending(true);
+
+    const message: LiveChatMessage = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      text: text.slice(0, 220),
+      author: chatAuthor,
+      createdAt: Date.now(),
+    };
+
+    try {
+      await chatChannelRef.current.send({
+        type: "broadcast",
+        event: "chat-message",
+        payload: message,
+      });
+      setChatInput("");
+    } finally {
+      setChatSending(false);
     }
   };
 
@@ -334,6 +423,93 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
           {shareMessage}
         </div>
       ) : null}
+
+      <section
+        style={{
+          position: "fixed",
+          left: 12,
+          right: 88,
+          bottom: 14,
+          zIndex: 14,
+          display: "grid",
+          gap: 8,
+        }}
+      >
+        <div
+          style={{
+            maxHeight: 150,
+            overflowY: "auto",
+            display: "grid",
+            gap: 6,
+            pointerEvents: "none",
+          }}
+        >
+          {chatMessages.slice(-8).map((message) => (
+            <div
+              key={message.id}
+              style={{
+                width: "fit-content",
+                maxWidth: "100%",
+                padding: "6px 10px",
+                borderRadius: 10,
+                background: "rgba(2,6,23,0.72)",
+                border: "1px solid rgba(148,163,184,0.35)",
+                color: "#fff",
+                fontSize: 12,
+                lineHeight: 1.35,
+              }}
+            >
+              <strong style={{ color: "#93c5fd" }}>{message.author}</strong> {message.text}
+            </div>
+          ))}
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr auto",
+            gap: 8,
+          }}
+        >
+          <input
+            value={chatInput}
+            onChange={(event) => setChatInput(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                void sendChatMessage();
+              }
+            }}
+            placeholder="Saisis ton message"
+            maxLength={220}
+            style={{
+              borderRadius: 999,
+              border: "1px solid rgba(148,163,184,0.45)",
+              padding: "11px 14px",
+              background: "rgba(2,6,23,0.78)",
+              color: "#fff",
+              outline: "none",
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => void sendChatMessage()}
+            disabled={chatSending || !chatInput.trim()}
+            style={{
+              borderRadius: 999,
+              border: "1px solid rgba(147,197,253,0.55)",
+              padding: "10px 14px",
+              background: "rgba(37,99,235,0.88)",
+              color: "#fff",
+              fontWeight: 700,
+              cursor: chatSending || !chatInput.trim() ? "not-allowed" : "pointer",
+              opacity: chatSending || !chatInput.trim() ? 0.7 : 1,
+            }}
+          >
+            Envoyer
+          </button>
+        </div>
+      </section>
 
     </main>
   );
