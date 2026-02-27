@@ -120,3 +120,20 @@ Puis relancer les vérifications section 1.
 - Confirmer que les clés sensibles restent côté serveur uniquement.
 - Vérifier policies RLS et supprimer tout contournement temporaire quand stable.
 - Contrôler régulièrement `/api/health` et erreurs API critiques.
+
+---
+
+## 6) Validation finale (PASS)
+
+Date: 2026-02-27
+
+Résumé:
+- Auth utilisateur: PASS
+- Rôle creator + caméra active + badge certifié: PASS
+- Déconnexion (`/auth`, `/lives`, `/watch`): PASS
+- `GET /api/health`: PASS (200)
+- `GET /api/agora/token?channel=test`: PASS (200)
+- Test agent IA authentifié: PASS (`status: 200`)
+
+Décision:
+- MVP déclaré opérationnel en production.
