@@ -1,5 +1,24 @@
 # Runbook Production — Famous AI
 
+## Procédure 30 secondes
+
+1. Vérifier santé:
+```powershell
+$u='https://www.pitchci.com/api/health'; try { $r=Invoke-WebRequest -UseBasicParsing -Uri $u -TimeoutSec 20; "HEALTH=$($r.StatusCode) $($r.Content)" } catch { "ERR=$($_.Exception.Message)" }
+```
+
+2. Vérifier Agora:
+```powershell
+$u='https://www.pitchci.com/api/agora/token?channel=test'; try { $r=Invoke-WebRequest -UseBasicParsing -Uri $u -TimeoutSec 25; "AGORA=$($r.StatusCode)" } catch { "ERR=$($_.Exception.Message)" }
+```
+
+3. Si incident UX live:
+- Faire `Ctrl+F5` sur `/watch` et `/lives`
+- Vérifier connexion utilisateur
+- Si RLS `lives` casse: activer temporairement le contournement `/api/lives/feed`
+
+---
+
 ## 1) Vérifications rapides (2 min)
 
 Exécuter dans PowerShell:
