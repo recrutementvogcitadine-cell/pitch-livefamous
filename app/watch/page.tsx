@@ -126,8 +126,6 @@ export default function WatchPage() {
     const loadFollowState = async () => {
       try {
         const authHeaders = await getAuthHeaders();
-        if (!authHeaders.Authorization) return;
-
         const response = await fetch(`/api/live-notify/follow?creators=${encodeURIComponent(creatorIds.join(","))}`, {
           cache: "no-store",
           headers: authHeaders,
@@ -368,10 +366,6 @@ export default function WatchPage() {
 
     try {
       const authHeaders = await getAuthHeaders();
-      if (!authHeaders.Authorization) {
-        throw new Error("Session expirée. Reconnectez-vous puis réessayez.");
-      }
-
       const response = await fetch("/api/live-notify/follow", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders },
