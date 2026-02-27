@@ -32,6 +32,9 @@ export default function ModerationPage() {
     () => (status === "open" ? "Escalades ouvertes" : "Escalades résolues"),
     [status]
   );
+  const lastRefreshLabel = lastRefreshAt
+    ? lastRefreshAt.toLocaleTimeString("fr-FR", { hour12: false })
+    : "--:--:--";
 
   const loadRows = async (nextStatus: EscalationStatus) => {
     setLoading(true);
@@ -186,8 +189,11 @@ export default function ModerationPage() {
       </section>
 
       <div style={floatingRefreshWrapStyle}>
-        <span style={floatingRefreshLabelStyle}>
-          Dernière maj: {lastRefreshAt ? lastRefreshAt.toLocaleTimeString("fr-FR", { hour12: false }) : "--:--:--"}
+        <span style={floatingRefreshLabelStyle} className="refresh-label refresh-label-desktop">
+          Dernière maj: {lastRefreshLabel}
+        </span>
+        <span style={floatingRefreshLabelStyle} className="refresh-label refresh-label-mobile">
+          Maj {lastRefreshLabel}
         </span>
         <button
           type="button"
@@ -211,6 +217,20 @@ export default function ModerationPage() {
           }
           to {
             transform: rotate(360deg);
+          }
+        }
+
+        .refresh-label-mobile {
+          display: none;
+        }
+
+        @media (max-width: 640px) {
+          .refresh-label-desktop {
+            display: none;
+          }
+
+          .refresh-label-mobile {
+            display: inline-flex;
           }
         }
       `}</style>
