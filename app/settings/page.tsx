@@ -99,6 +99,9 @@ export default function SettingsPage() {
         </p>
 
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <Link href="/settings/admin" style={previewBtnStyle}>
+            Ouvrir dashboard administrateur
+          </Link>
           <Link href="/settings/moderation" style={previewBtnStyle}>
             Ouvrir dashboard modération IA
           </Link>
