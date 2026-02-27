@@ -369,7 +369,7 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
         <Link href="/watch" style={{ color: "#93c5fd", textDecoration: "none", fontWeight: 700 }}>
           ← Retour au flux
         </Link>
-        <span style={{ fontSize: 13, opacity: 0.9 }}>{hasVideo ? "EN DIRECT" : "Chargement"}</span>
+        <span style={{ fontSize: 13, opacity: 0.9 }}>{hasVideo ? "EN DIRECT" : "LIVE IA (SANS CAMÉRA)"}</span>
       </header>
 
       <section className="live-video-shell" style={{ padding: 12 }}>
@@ -380,7 +380,7 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
             height: "100%",
             borderRadius: 12,
             border: "1px solid rgba(255,255,255,0.2)",
-            background: "radial-gradient(circle at 30% 20%, #1d4ed8 0%, #0f172a 45%, #020617 100%)",
+            background: "radial-gradient(circle at 50% 20%, #0f172a 0%, #020617 55%, #000 100%)",
             overflow: "hidden",
             position: "relative",
           }}
@@ -397,8 +397,39 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
                 background: "rgba(2,6,23,0.35)",
               }}
             >
-              <div style={{ maxWidth: 320 }}>
+              <div
+                style={{
+                  maxWidth: 360,
+                  border: "1px solid rgba(147,197,253,0.45)",
+                  borderRadius: 14,
+                  padding: "16px 14px",
+                  background: "rgba(2,6,23,0.74)",
+                  backdropFilter: "blur(2px)",
+                }}
+              >
+                <div style={{ display: "grid", placeItems: "center", marginBottom: 10 }}>
+                  <div
+                    style={{
+                      width: 62,
+                      height: 62,
+                      borderRadius: "50%",
+                      display: "grid",
+                      placeItems: "center",
+                      fontSize: 28,
+                      background: "linear-gradient(135deg, #1d4ed8, #2563eb)",
+                      border: "1px solid rgba(191,219,254,0.7)",
+                    }}
+                  >
+                    👩🏾
+                  </div>
+                  <strong style={{ marginTop: 8, color: "#bfdbfe" }}>Akoua • Live IA</strong>
+                </div>
                 <p style={{ margin: "0 0 10px", fontWeight: 700 }}>{status}</p>
+                {!safariOnlyMode ? (
+                  <p style={{ margin: "0 0 12px", color: "#e2e8f0", fontSize: 13, lineHeight: 1.35 }}>
+                    Ce live fonctionne sans caméra. Écris en bas pour discuter avec l'IA en direct.
+                  </p>
+                ) : null}
                 {noVideoHint && !safariOnlyMode ? (
                   <p style={{ margin: "0 0 12px", color: "#bfdbfe", fontSize: 13, lineHeight: 1.35 }}>
                     Aucun flux caméra actif pour le moment. Continue avec le chat en bas: l'IA peut répondre sans vidéo.
