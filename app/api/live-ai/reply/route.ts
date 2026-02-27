@@ -976,10 +976,16 @@ export async function POST(req: Request) {
   } catch (error: unknown) {
     return NextResponse.json(
       {
-        error: "live ai reply failed",
+        liveId: "unknown",
+        reply: `${AI_DISCLOSURE} Je rencontre un souci technique temporaire. Réessaie dans quelques secondes.`,
+        disclosure: AI_DISCLOSURE,
+        confidence: 0.41,
+        escalated: false,
+        degraded: true,
+        error: "live ai reply fallback",
         detail: String(error),
       },
-      { status: 500 }
+      { status: 200 }
     );
   }
 }
