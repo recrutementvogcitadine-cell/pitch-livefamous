@@ -12,6 +12,7 @@ type LiveRow = {
   status: string | null;
   created_at: string | null;
   creator_id: string | null;
+  creator_whatsapp?: string | null;
   creator_verified?: boolean | null;
   creator_is_certified?: boolean | null;
   is_certified?: boolean | null;
@@ -740,6 +741,16 @@ export default function WatchPage() {
                     <Link href="/auth?mode=creator" style={{ ...actionStyle, background: "rgba(30,41,59,0.9)" }}>
                       {buttonLabels.becomeCreatorLabel}
                     </Link>
+                    {live.creator_whatsapp ? (
+                      <a
+                        href={`https://wa.me/${encodeURIComponent(live.creator_whatsapp.replace(/[^\d]/g, ""))}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={whatsappActionStyle}
+                      >
+                        WhatsApp créateur
+                      </a>
+                    ) : null}
                   </>
                 ) : null}
                 {live.creator_id && live.creator_id === currentUserId ? (
@@ -960,6 +971,13 @@ const cameraIconBadgeStyle: CSSProperties = {
 const goLiveLabelStyle: CSSProperties = {
   lineHeight: 1,
   fontWeight: 800,
+};
+
+const whatsappActionStyle: CSSProperties = {
+  ...actionStyle,
+  background: "#16a34a",
+  border: "1px solid rgba(255,255,255,0.28)",
+  boxShadow: "0 8px 18px rgba(22,163,74,0.35)",
 };
 
 const newBadgeStyle: CSSProperties = {
