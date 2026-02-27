@@ -186,12 +186,27 @@ export default function ModerationPage() {
       <button
         type="button"
         onClick={() => void loadRows(status)}
-        style={floatingRefreshStyle}
+        style={{
+          ...floatingRefreshStyle,
+          ...(loading ? floatingRefreshLoadingStyle : null),
+        }}
         aria-label="Rafraîchir les escalades"
         title="Rafraîchir"
+        disabled={loading}
       >
         ↻
       </button>
+
+      <style jsx>{`
+        @keyframes spinRefresh {
+          from {
+            transform: rotate(0deg);
+          }
+          to {
+            transform: rotate(360deg);
+          }
+        }
+      `}</style>
     </main>
   );
 }
@@ -310,4 +325,10 @@ const floatingRefreshStyle: CSSProperties = {
   lineHeight: 1,
   cursor: "pointer",
   boxShadow: "0 8px 24px rgba(15, 23, 42, 0.25)",
+};
+
+const floatingRefreshLoadingStyle: CSSProperties = {
+  animation: "spinRefresh 0.9s linear infinite",
+  cursor: "wait",
+  opacity: 0.9,
 };
