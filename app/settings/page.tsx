@@ -215,6 +215,9 @@ export default function SettingsPage() {
         <p style={{ margin: 0, color: "#4b5563" }}>
           Cette annonce sera affichée sur votre profil créateur, avec vos anciens lives, quand vous n&apos;êtes pas en direct.
         </p>
+        <p style={{ margin: 0, color: "#166534", fontWeight: 700 }}>
+          Contactez-nous via WhatsApp pour identification et activation de votre compte créateur.
+        </p>
 
         {loadingSchedule ? <p style={{ margin: 0, color: "#64748b" }}>Chargement de votre configuration créateur...</p> : null}
 

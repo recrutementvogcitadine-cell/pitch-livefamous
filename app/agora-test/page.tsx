@@ -244,9 +244,9 @@ export default function AgoraTestPage() {
 
       {upgradeRequired ? (
         <div style={{ marginBottom: 12, padding: 12, border: '1px solid #fecaca', background: '#fff1f2', borderRadius: 10 }}>
-          <strong>Validation créateur requise</strong>
+          <strong>Inscription créateur en attente de validation</strong>
           <p style={{ margin: '6px 0' }}>
-            Pour activer la caméra et passer en live, envoyez votre demande créateur puis contactez l&apos;admin sur WhatsApp pour vérification.
+            Contactez-nous via WhatsApp pour identification et activation de votre compte créateur.
           </p>
           <Link href="/auth?mode=creator" style={{ color: '#1d4ed8', fontWeight: 700 }}>
             Aller vers profil créateur
