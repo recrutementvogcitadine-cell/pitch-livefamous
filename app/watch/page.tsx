@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type UIEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent, type UIEvent } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { useAppLogo } from "../components/app-logo";
 import LiveNotificationControls from "../components/LiveNotificationControls";
@@ -281,6 +281,17 @@ export default function WatchPage() {
       setShareMessage("Partage annulé");
       window.setTimeout(() => setShareMessage(null), 1200);
     }
+  };
+
+  const openLiveByTap = (event: MouseEvent<HTMLElement>, live: LiveRow) => {
+    if (live.creator_id && currentUserId && live.creator_id === currentUserId) return;
+
+    const target = event.target as HTMLElement | null;
+    if (target?.closest("a,button,input,select,textarea,label,video")) {
+      return;
+    }
+
+    window.location.href = `/lives/${live.id}`;
   };
 
   const getAuthHeaders = async (): Promise<Record<string, string>> => {
@@ -603,7 +614,11 @@ export default function WatchPage() {
           </div>
         ) : null}
         {lives.map((live) => (
-          <section key={live.id} style={slideStyle}>
+          <section
+            key={live.id}
+            style={{ ...slideStyle, cursor: live.creator_id !== currentUserId ? "pointer" : "default" }}
+            onClick={(event) => openLiveByTap(event, live)}
+          >
             <aside style={actionRailStyle}>
               <button onClick={() => toggleLike(live.id)} style={actionBtnStyle} aria-label="Like">
                 {likedByLive[live.id] ? "❤️" : "🤍"}
