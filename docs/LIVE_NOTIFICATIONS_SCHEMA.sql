@@ -64,6 +64,20 @@ create table if not exists public.creator_live_schedule (
 create index if not exists creator_live_schedule_next_live_idx
   on public.creator_live_schedule (next_live_at);
 
+create table if not exists public.app_branding_settings (
+  id integer primary key,
+  app_name text not null default 'Pitch Live',
+  welcome_message text not null default 'Bienvenue sur Pitch Live — découvrez les lives en cours et connectez-vous en temps réel.',
+  logo_src text not null default '/famous-ai-logo.svg',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint app_branding_settings_singleton check (id = 1)
+);
+
+insert into public.app_branding_settings (id)
+values (1)
+on conflict (id) do nothing;
+
 -- Keep updated_at fresh on upserts/updates.
 create or replace function public.set_updated_at_timestamp()
 returns trigger
@@ -84,5 +98,11 @@ execute function public.set_updated_at_timestamp();
 drop trigger if exists trg_creator_live_schedule_updated_at on public.creator_live_schedule;
 create trigger trg_creator_live_schedule_updated_at
 before update on public.creator_live_schedule
+for each row
+execute function public.set_updated_at_timestamp();
+
+drop trigger if exists trg_app_branding_settings_updated_at on public.app_branding_settings;
+create trigger trg_app_branding_settings_updated_at
+before update on public.app_branding_settings
 for each row
 execute function public.set_updated_at_timestamp();

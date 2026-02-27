@@ -4,10 +4,10 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { createClient } from "@supabase/supabase-js";
 import AddToHomeButton from "./components/AddToHomeButton";
-import { useAppLogo } from "./components/app-logo";
+import { useAppBranding } from "./components/app-branding";
 
 export default function Home() {
-  const appLogo = useAppLogo();
+  const branding = useAppBranding();
 
   const client = useMemo(() => {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -48,16 +48,16 @@ export default function Home() {
       <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <img
-            src={appLogo}
-            alt="Logo Famous AI"
+            src={branding.logoSrc}
+            alt={`Logo ${branding.appName}`}
             width={46}
             height={46}
             style={{ borderRadius: 10, objectFit: "cover", border: "1px solid #bfdbfe", background: "#fff" }}
           />
           <div>
-            <h1 style={{ fontSize: 30, margin: 0 }}>Famous AI</h1>
+            <h1 style={{ fontSize: 30, margin: 0 }}>{branding.appName}</h1>
             <p style={{ margin: "8px 0 0", color: "#4b5563" }}>
-              Plateforme live interactive: diffusion vidéo, données temps réel et expérience mobile.
+              {branding.welcomeMessage}
             </p>
           </div>
         </div>

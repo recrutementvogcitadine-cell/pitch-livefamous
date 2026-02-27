@@ -29,6 +29,13 @@ type LiveNotifyStats = {
   eventsTableMissing?: boolean;
 };
 
+type BrandingSettings = {
+  appName: string;
+  welcomeMessage: string;
+  logoSrc: string;
+  error?: string;
+};
+
 type ButtonLabelSettings = {
   goLiveLabel: string;
   goLiveCreatorLabel: string;
@@ -76,6 +83,13 @@ export default function AdminDashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [loadingStats, setLoadingStats] = useState(true);
   const [notifyStats, setNotifyStats] = useState<LiveNotifyStats | null>(null);
+  const [loadingBranding, setLoadingBranding] = useState(true);
+  const [savingBranding, setSavingBranding] = useState(false);
+  const [branding, setBranding] = useState<BrandingSettings>({
+    appName: "Pitch Live",
+    welcomeMessage: "Bienvenue sur Pitch Live — découvrez les lives en cours et connectez-vous en temps réel.",
+    logoSrc: "/famous-ai-logo.svg",
+  });
   const [loadingButtonLabels, setLoadingButtonLabels] = useState(true);
   const [savingButtonLabels, setSavingButtonLabels] = useState(false);
   const [buttonLabels, setButtonLabels] = useState<ButtonLabelSettings>({
@@ -148,6 +162,58 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     void loadNotifyStats();
   }, []);
+
+  const loadBranding = async () => {
+    setLoadingBranding(true);
+    try {
+      const response = await fetch("/api/admin/branding", { cache: "no-store" });
+      const body = (await response.json()) as BrandingSettings;
+      if (!response.ok) {
+        throw new Error(body.error ?? "Impossible de charger le branding.");
+      }
+
+      setBranding((prev) => ({
+        ...prev,
+        appName: body.appName ?? prev.appName,
+        welcomeMessage: body.welcomeMessage ?? prev.welcomeMessage,
+        logoSrc: body.logoSrc ?? prev.logoSrc,
+      }));
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoadingBranding(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadBranding();
+  }, []);
+
+  const saveBranding = async () => {
+    setSavingBranding(true);
+    setMessage(null);
+    setError(null);
+    try {
+      const response = await fetch("/api/admin/branding", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          appName: branding.appName,
+          welcomeMessage: branding.welcomeMessage,
+          logoSrc: branding.logoSrc,
+        }),
+      });
+      const body = (await response.json()) as { ok?: boolean; error?: string };
+      if (!response.ok || !body.ok) {
+        throw new Error(body.error ?? "Enregistrement branding impossible.");
+      }
+      setMessage("Branding public mis à jour ✅");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSavingBranding(false);
+    }
+  };
 
   const loadButtonLabels = async () => {
     setLoadingButtonLabels(true);
@@ -340,6 +406,70 @@ export default function AdminDashboardPage() {
             <p style={{ margin: 0, color: "#92400e", fontSize: 13 }}>
               Historique d&apos;envoi indisponible: exécuter le SQL `live_notification_events` en prod.
             </p>
+          ) : null}
+        </section>
+
+        <section style={roleCardStyle}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <div>
+              <h2 style={{ margin: 0 }}>Branding public</h2>
+              <p style={{ margin: "6px 0 0", color: "#475569" }}>
+                Modifier le nom app, le message d&apos;accueil et le logo visibles sur l&apos;accueil et le bouton installer.
+              </p>
+            </div>
+            <button type="button" onClick={() => void loadBranding()} style={action3DDarkStyle}>
+              Rafraîchir
+            </button>
+          </div>
+
+          {loadingBranding ? <p style={{ margin: 0 }}>Chargement branding...</p> : null}
+
+          {!loadingBranding ? (
+            <div style={{ display: "grid", gap: 8 }}>
+              <label style={fieldLabelStyle}>
+                Nom application
+                <input
+                  value={branding.appName}
+                  onChange={(event) => setBranding((prev) => ({ ...prev, appName: event.target.value }))}
+                  style={inputStyle}
+                  maxLength={80}
+                  disabled={savingBranding}
+                />
+              </label>
+
+              <label style={fieldLabelStyle}>
+                Message d&apos;accueil nouveaux venus
+                <textarea
+                  value={branding.welcomeMessage}
+                  onChange={(event) => setBranding((prev) => ({ ...prev, welcomeMessage: event.target.value }))}
+                  style={{ ...inputStyle, minHeight: 80, resize: "vertical" }}
+                  maxLength={220}
+                  disabled={savingBranding}
+                />
+              </label>
+
+              <label style={fieldLabelStyle}>
+                Logo (URL ou data:image/...)
+                <input
+                  value={branding.logoSrc}
+                  onChange={(event) => setBranding((prev) => ({ ...prev, logoSrc: event.target.value }))}
+                  style={inputStyle}
+                  maxLength={2000}
+                  disabled={savingBranding}
+                />
+              </label>
+
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <img src={branding.logoSrc} alt="Aperçu logo" width={34} height={34} style={{ borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff" }} />
+                <strong style={{ color: "#0f172a" }}>{branding.appName}</strong>
+              </div>
+
+              <div>
+                <button type="button" onClick={() => void saveBranding()} style={action3DPrimaryStyle} disabled={savingBranding}>
+                  {savingBranding ? "Enregistrement..." : "Enregistrer branding"}
+                </button>
+              </div>
+            </div>
           ) : null}
         </section>
 

@@ -1,10 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useAppLogo } from "./app-logo";
+import { useAppBranding } from "./app-branding";
 
 export default function AddToHomeButton() {
   const [deferredPrompt, setDeferredPrompt] = useState<Event | null>(null);
-  const appLogo = useAppLogo();
+  const branding = useAppBranding();
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -53,8 +53,8 @@ export default function AddToHomeButton() {
         }}
       >
         <img
-          src={appLogo}
-          alt="Logo Famous AI"
+          src={branding.logoSrc}
+          alt={`Logo ${branding.appName}`}
           width={22}
           height={22}
           style={{ borderRadius: 6, background: "#fff", padding: 2 }}
