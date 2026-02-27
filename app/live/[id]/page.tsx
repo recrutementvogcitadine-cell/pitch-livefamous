@@ -39,6 +39,21 @@ type LocalHistoryItem = {
   content: string;
 };
 
+function buildLocalAiFallback(input: string) {
+  const text = input.trim().toLowerCase();
+  if (!text) return "Je suis Akoua IA ✨ Dis-moi ce que tu veux savoir sur ce live.";
+  if (text.includes("prix") || text.includes("tarif") || text.includes("coût")) {
+    return "Je suis Akoua IA ✨ Pour les prix/tarifs, je peux te guider selon ton besoin. Donne-moi ton objectif et ton budget.";
+  }
+  if (text.includes("bonjour") || text.includes("salut") || text.includes("hello")) {
+    return "Je suis Akoua IA ✨ Salut 👋 Je suis là en direct. Pose ta question et je te réponds tout de suite.";
+  }
+  if (text.includes("live") || text.includes("video") || text.includes("cam")) {
+    return "Je suis Akoua IA ✨ Ce live est en mode chat sans caméra. Écris-moi ce que tu veux et on avance ensemble.";
+  }
+  return "Je suis Akoua IA ✨ Bien reçu. Donne-moi un peu plus de détails et je te réponds de façon claire et rapide.";
+}
+
 export default function LiveViewerPage({ params }: { params: PageParams }) {
   const [status, setStatus] = useState("Connexion au live...");
   const [resolvedId, setResolvedId] = useState("");
@@ -383,14 +398,11 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
         const replyBody = (await replyRes.json()) as { reply?: string; error?: string };
         const replyText = (replyBody.reply || "").trim();
 
-        if (!replyRes.ok || !replyText) {
-          setAiHistory(nextHistory);
-          return;
-        }
+        const finalReplyText = replyRes.ok && replyText ? replyText : buildLocalAiFallback(text);
 
         const assistantMessage: LiveChatMessage = {
           id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-          text: replyText.slice(0, 220),
+          text: finalReplyText.slice(0, 220),
           author: "@akoua_ia",
           createdAt: Date.now(),
         };
@@ -401,11 +413,28 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
           payload: assistantMessage,
         });
 
-        const assistantTurn: LocalHistoryItem = { role: "assistant", content: replyText.slice(0, 500) };
+        const assistantTurn: LocalHistoryItem = { role: "assistant", content: finalReplyText.slice(0, 500) };
         const withAssistant: LocalHistoryItem[] = [...nextHistory, assistantTurn].slice(-12);
         setAiHistory(withAssistant);
       } catch {
-        setAiHistory(nextHistory);
+        const fallbackText = buildLocalAiFallback(text);
+        const fallbackMessage: LiveChatMessage = {
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          text: fallbackText.slice(0, 220),
+          author: "@akoua_ia",
+          createdAt: Date.now(),
+        };
+
+        try {
+          await chatChannelRef.current.send({
+            type: "broadcast",
+            event: "chat-message",
+            payload: fallbackMessage,
+          });
+        } catch {}
+
+        const assistantTurn: LocalHistoryItem = { role: "assistant", content: fallbackText.slice(0, 500) };
+        setAiHistory([...nextHistory, assistantTurn].slice(-12));
       } finally {
         setAiReplying(false);
       }
