@@ -375,35 +375,6 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
         </div>
       </section>
 
-      <aside
-        style={{
-          position: "fixed",
-          right: 12,
-          bottom: 116,
-          zIndex: 12,
-          display: "grid",
-          gap: 10,
-        }}
-      >
-        <button
-          type="button"
-          onClick={() => setLiked((value) => !value)}
-          style={liveActionButtonStyle}
-          aria-label="Like"
-        >
-          {liked ? "❤️" : "🤍"}
-          <span style={liveActionTextStyle}>Like</span>
-        </button>
-        <Link href={resolvedId ? `/lives/${encodeURIComponent(resolvedId)}` : "/lives"} style={liveActionButtonStyle} aria-label="Commentaire">
-          💬
-          <span style={liveActionTextStyle}>Comment</span>
-        </Link>
-        <button type="button" onClick={() => void shareLive()} style={liveActionButtonStyle} aria-label="Partager">
-          ↗️
-          <span style={liveActionTextStyle}>Share</span>
-        </button>
-      </aside>
-
       {shareMessage ? (
         <div
           style={{
@@ -428,7 +399,7 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
         style={{
           position: "fixed",
           left: 12,
-          right: 88,
+          right: 12,
           bottom: 14,
           zIndex: 14,
           display: "grid",
@@ -467,7 +438,7 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "1fr auto",
+            gridTemplateColumns: "1fr auto auto auto",
             gap: 8,
           }}
         >
@@ -493,6 +464,17 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
           />
           <button
             type="button"
+            onClick={() => setLiked((value) => !value)}
+            style={chatSideActionButtonStyle}
+            aria-label="Like"
+          >
+            {liked ? "❤️" : "🤍"}
+          </button>
+          <button type="button" onClick={() => void shareLive()} style={chatSideActionButtonStyle} aria-label="Partager">
+            ↗️
+          </button>
+          <button
+            type="button"
             onClick={() => void sendChatMessage()}
             disabled={chatSending || !chatInput.trim()}
             style={{
@@ -515,25 +497,15 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
   );
 }
 
-const liveActionButtonStyle = {
-  width: 64,
-  height: 64,
+const chatSideActionButtonStyle = {
+  width: 42,
+  height: 42,
   borderRadius: 999,
   border: "1px solid rgba(255,255,255,0.25)",
   background: "rgba(15, 23, 42, 0.7)",
   color: "#fff",
-  display: "inline-flex",
-  flexDirection: "column",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: 2,
-  textDecoration: "none",
+  display: "grid",
+  placeItems: "center",
   fontSize: 18,
   cursor: "pointer",
-} as const;
-
-const liveActionTextStyle = {
-  fontSize: 11,
-  fontWeight: 700,
-  lineHeight: 1,
 } as const;
