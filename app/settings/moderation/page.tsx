@@ -188,8 +188,9 @@ export default function ModerationPage() {
         onClick={() => void loadRows(status)}
         style={floatingRefreshStyle}
         aria-label="Rafraîchir les escalades"
+        title="Rafraîchir"
       >
-        Rafraîchir
+        ↻
       </button>
     </main>
   );
@@ -300,10 +301,13 @@ const floatingRefreshStyle: CSSProperties = {
   zIndex: 40,
   border: "none",
   borderRadius: 999,
-  padding: "10px 14px",
+  width: 44,
+  height: 44,
   background: "#1d4ed8",
   color: "#fff",
   fontWeight: 800,
+  fontSize: 22,
+  lineHeight: 1,
   cursor: "pointer",
   boxShadow: "0 8px 24px rgba(15, 23, 42, 0.25)",
 };
