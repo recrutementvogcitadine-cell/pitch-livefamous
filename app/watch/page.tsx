@@ -679,9 +679,13 @@ export default function WatchPage() {
                 ) : null}
               </div>
               <div style={{ margin: "8px 0 0", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                <p style={{ margin: 0, opacity: 0.95, fontWeight: 700 }}>
-                  @{live.creator_id ? live.creator_id.slice(0, 8) : "createur"}
-                </p>
+                {live.creator_id ? (
+                  <Link href={`/creator/${encodeURIComponent(live.creator_id)}`} style={creatorHandleStyle}>
+                    @{live.creator_id.slice(0, 8)}
+                  </Link>
+                ) : (
+                  <p style={{ margin: 0, opacity: 0.95, fontWeight: 700 }}>@createur</p>
+                )}
                 {isCreatorCertified(live) ? (
                   <span style={verifiedBadgeStyle} title="Créateur certifié" aria-label="Créateur certifié">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -1088,6 +1092,14 @@ const followedCreatorBadgeStyle: CSSProperties = {
   color: "#e0f2fe",
   fontSize: 11,
   fontWeight: 700,
+};
+
+const creatorHandleStyle: CSSProperties = {
+  margin: 0,
+  opacity: 0.95,
+  fontWeight: 700,
+  color: "#fff",
+  textDecoration: "none",
 };
 
 const aiPanelStyle: CSSProperties = {

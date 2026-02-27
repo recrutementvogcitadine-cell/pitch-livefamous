@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type ChangeEvent, type CSSProperties } from "react";
+import { useEffect, useState, type ChangeEvent, type CSSProperties } from "react";
 import {
   clearStoredAppLogo,
   DEFAULT_APP_LOGO,
@@ -28,6 +28,39 @@ export default function SettingsPage() {
   const [promoConfig, setPromoConfig] = useState<PromoConfig>(readPromoConfig);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [nextLiveAt, setNextLiveAt] = useState("");
+  const [nextLiveAnnouncement, setNextLiveAnnouncement] = useState("");
+  const [loadingSchedule, setLoadingSchedule] = useState(true);
+  const [savingSchedule, setSavingSchedule] = useState(false);
+  const [creatorProfileHref, setCreatorProfileHref] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadSchedule = async () => {
+      setLoadingSchedule(true);
+      try {
+        const response = await fetch("/api/creator/schedule", { cache: "no-store" });
+        if (!response.ok) {
+          setLoadingSchedule(false);
+          return;
+        }
+        const body = (await response.json()) as { creatorId?: string; nextLiveAt?: string | null; announcement?: string };
+        setNextLiveAt(
+          typeof body.nextLiveAt === "string" && body.nextLiveAt
+            ? new Date(body.nextLiveAt).toISOString().slice(0, 16)
+            : ""
+        );
+        setNextLiveAnnouncement(typeof body.announcement === "string" ? body.announcement : "");
+        if (typeof body.creatorId === "string" && body.creatorId.trim()) {
+          setCreatorProfileHref(`/creator/${encodeURIComponent(body.creatorId)}`);
+        }
+      } catch {
+      } finally {
+        setLoadingSchedule(false);
+      }
+    };
+
+    void loadSchedule();
+  }, []);
 
   const onFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -88,6 +121,31 @@ export default function SettingsPage() {
     setError(null);
   };
 
+  const saveNextLiveSchedule = async () => {
+    setSavingSchedule(true);
+    setMessage(null);
+    setError(null);
+    try {
+      const response = await fetch("/api/creator/schedule", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nextLiveAt: nextLiveAt ? new Date(nextLiveAt).toISOString() : null,
+          announcement: nextLiveAnnouncement,
+        }),
+      });
+      const body = (await response.json()) as { ok?: boolean; error?: string };
+      if (!response.ok || !body.ok) {
+        throw new Error(body.error ?? "Impossible d'enregistrer l'annonce du prochain live.");
+      }
+      setMessage("Annonce du prochain live enregistrée ✅");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSavingSchedule(false);
+    }
+  };
+
   return (
     <main style={pageStyle}>
       <section style={cardStyle}>
@@ -139,6 +197,47 @@ export default function SettingsPage() {
 
         {message ? <p style={{ color: "#15803d", margin: 0 }}>{message}</p> : null}
         {error ? <p style={{ color: "#b91c1c", margin: 0 }}>Erreur: {error}</p> : null}
+
+        <hr style={{ border: 0, borderTop: "1px solid #e2e8f0" }} />
+
+        <h2 style={{ margin: 0 }}>Annonce du prochain live (profil créateur)</h2>
+        <p style={{ margin: 0, color: "#4b5563" }}>
+          Cette annonce sera affichée sur votre profil créateur, avec vos anciens lives, quand vous n&apos;êtes pas en direct.
+        </p>
+
+        {loadingSchedule ? <p style={{ margin: 0, color: "#64748b" }}>Chargement de votre configuration créateur...</p> : null}
+
+        <label style={{ display: "grid", gap: 6, fontWeight: 600 }}>
+          Date du prochain live
+          <input
+            type="datetime-local"
+            value={nextLiveAt}
+            onChange={(e) => setNextLiveAt(e.target.value)}
+            style={inputUiStyle}
+            disabled={savingSchedule}
+          />
+        </label>
+
+        <label style={{ display: "grid", gap: 6, fontWeight: 600 }}>
+          Message d&apos;annonce
+          <textarea
+            value={nextLiveAnnouncement}
+            onChange={(e) => setNextLiveAnnouncement(e.target.value)}
+            style={{ ...inputUiStyle, minHeight: 70, resize: "vertical" }}
+            placeholder="Ex: Rendez-vous ce soir 21h pour un live FAQ"
+            maxLength={180}
+            disabled={savingSchedule}
+          />
+        </label>
+
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <button onClick={saveNextLiveSchedule} style={previewBtnStyle} disabled={savingSchedule}>
+            {savingSchedule ? "Enregistrement..." : "Enregistrer prochain live"}
+          </button>
+          <Link href={creatorProfileHref ?? "/watch"} style={previewBtnStyle}>
+            Voir profil créateur
+          </Link>
+        </div>
 
         <hr style={{ border: 0, borderTop: "1px solid #e2e8f0" }} />
 
