@@ -486,8 +486,8 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
 
         <div
           style={{
-            display: "grid",
-            gridTemplateColumns: "1fr auto auto auto",
+            display: "flex",
+            alignItems: "center",
             gap: 8,
           }}
         >
@@ -503,6 +503,8 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
             placeholder="Saisis ton message"
             maxLength={220}
             style={{
+              flex: 1,
+              minWidth: 0,
               borderRadius: 999,
               border: "1px solid rgba(148,163,184,0.45)",
               padding: "11px 14px",
@@ -529,10 +531,14 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
             style={{
               borderRadius: 999,
               border: "1px solid rgba(147,197,253,0.55)",
-              padding: "10px 14px",
+              width: 92,
+              minWidth: 92,
+              padding: "10px 12px",
               background: "rgba(37,99,235,0.88)",
               color: "#fff",
               fontWeight: 700,
+              whiteSpace: "nowrap",
+              flexShrink: 0,
               cursor: chatSending || !chatInput.trim() ? "not-allowed" : "pointer",
               opacity: chatSending || !chatInput.trim() ? 0.7 : 1,
             }}
@@ -548,6 +554,7 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
 
 const chatSideActionButtonStyle = {
   width: 42,
+  minWidth: 42,
   height: 42,
   borderRadius: 999,
   border: "1px solid rgba(255,255,255,0.25)",
@@ -556,5 +563,6 @@ const chatSideActionButtonStyle = {
   display: "grid",
   placeItems: "center",
   fontSize: 18,
+  flexShrink: 0,
   cursor: "pointer",
 } as const;
