@@ -192,7 +192,7 @@ export default function ModerationPage() {
         <span style={floatingRefreshLabelStyle} className="refresh-label refresh-label-desktop">
           Dernière maj: {lastRefreshLabel}
         </span>
-        <span style={floatingRefreshLabelStyle} className="refresh-label refresh-label-mobile">
+        <span style={floatingRefreshLabelMobileStyle} className="refresh-label refresh-label-mobile">
           Maj {lastRefreshLabel}
         </span>
         <button
@@ -367,6 +367,12 @@ const floatingRefreshLabelStyle: CSSProperties = {
   padding: "7px 10px",
   fontSize: 12,
   fontWeight: 700,
+};
+
+const floatingRefreshLabelMobileStyle: CSSProperties = {
+  ...floatingRefreshLabelStyle,
+  padding: "5px 8px",
+  fontSize: 11,
 };
 
 const floatingRefreshLoadingStyle: CSSProperties = {
