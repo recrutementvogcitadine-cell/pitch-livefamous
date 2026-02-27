@@ -30,6 +30,12 @@ type LiveAiAgent = {
   gender: "male" | "female";
 };
 
+type WatchButtonLabels = {
+  goLiveLabel: string;
+  goLiveCreatorLabel: string;
+  becomeCreatorLabel: string;
+};
+
 const PAGE_SIZE = 8;
 
 export default function WatchPage() {
@@ -58,6 +64,11 @@ export default function WatchPage() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [previewStream, setPreviewStream] = useState<MediaStream | null>(null);
+  const [buttonLabels, setButtonLabels] = useState<WatchButtonLabels>({
+    goLiveLabel: "Passer en live caméra",
+    goLiveCreatorLabel: "Passer en live (créateur)",
+    becomeCreatorLabel: "Devenir créateur",
+  });
   const previewVideoRef = useRef<HTMLVideoElement | null>(null);
   const appLogo = useAppLogo();
   const followedLivesCount = useMemo(
@@ -158,6 +169,29 @@ export default function WatchPage() {
 
     void loadFollowState();
   }, [lives]);
+
+  useEffect(() => {
+    const loadButtonLabels = async () => {
+      try {
+        const response = await fetch("/api/ui/button-labels", { cache: "no-store" });
+        if (!response.ok) return;
+        const body = (await response.json()) as Partial<WatchButtonLabels>;
+        setButtonLabels((prev) => ({
+          goLiveLabel: typeof body.goLiveLabel === "string" && body.goLiveLabel.trim() ? body.goLiveLabel : prev.goLiveLabel,
+          goLiveCreatorLabel:
+            typeof body.goLiveCreatorLabel === "string" && body.goLiveCreatorLabel.trim()
+              ? body.goLiveCreatorLabel
+              : prev.goLiveCreatorLabel,
+          becomeCreatorLabel:
+            typeof body.becomeCreatorLabel === "string" && body.becomeCreatorLabel.trim()
+              ? body.becomeCreatorLabel
+              : prev.becomeCreatorLabel,
+        }));
+      } catch {}
+    };
+
+    void loadButtonLabels();
+  }, []);
 
   useEffect(() => {
     if (!previewVideoRef.current || !previewStream) return;
@@ -590,18 +624,34 @@ export default function WatchPage() {
             </aside>
 
             <div style={overlayStyle}>
-              <img
-                src={appLogo}
-                alt="Logo app"
-                width={38}
-                height={38}
-                style={{ borderRadius: 10, border: "1px solid rgba(255,255,255,0.3)", background: "#fff" }}
-              />
-              <span style={badgeStyle}>EN DIRECT</span>
-              <span style={aiBadgeStyle}>Créateur virtuel IA</span>
-              {live.creator_id && currentUserId && live.creator_id !== currentUserId && followingByCreator[live.creator_id] ? (
-                <span style={followedCreatorBadgeStyle}>Créateur suivi</span>
-              ) : null}
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <img
+                  src={appLogo}
+                  alt="Logo app"
+                  width={38}
+                  height={38}
+                  style={{ borderRadius: 10, border: "1px solid rgba(255,255,255,0.3)", background: "#fff" }}
+                />
+                <span style={badgeStyle}>EN DIRECT</span>
+                <span style={aiBadgeStyle}>Créateur virtuel IA</span>
+                {live.creator_id && currentUserId && live.creator_id !== currentUserId && followingByCreator[live.creator_id] ? (
+                  <span style={followedCreatorBadgeStyle}>Créateur suivi</span>
+                ) : null}
+                {live.creator_id && live.creator_id !== currentUserId ? (
+                  <button
+                    type="button"
+                    onClick={() => void toggleFollow(live.creator_id)}
+                    disabled={Boolean(followLoadingByCreator[live.creator_id])}
+                    style={topFollowButtonStyle}
+                  >
+                    {followLoadingByCreator[live.creator_id]
+                      ? "..."
+                      : followingByCreator[live.creator_id]
+                        ? "Ne plus suivre"
+                        : "Suivre"}
+                  </button>
+                ) : null}
+              </div>
               <div style={{ margin: "8px 0 0", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                 <p style={{ margin: 0, opacity: 0.95, fontWeight: 700 }}>
                   @{live.creator_id ? live.creator_id.slice(0, 8) : "createur"}
@@ -653,26 +703,12 @@ export default function WatchPage() {
                           <path d="M16 10.2L20 8V16L16 13.8V10.2Z" fill="#ef4444" />
                         </svg>
                       </span>
-                      <span style={goLiveLabelStyle}>Passer en live caméra</span>
+                      <span style={goLiveLabelStyle}>{buttonLabels.goLiveLabel}</span>
                     </Link>
                     <Link href="/auth?mode=creator" style={{ ...actionStyle, background: "rgba(30,41,59,0.9)" }}>
-                      Devenir créateur
+                      {buttonLabels.becomeCreatorLabel}
                     </Link>
                   </>
-                ) : null}
-                {live.creator_id && live.creator_id !== currentUserId ? (
-                  <button
-                    type="button"
-                    onClick={() => void toggleFollow(live.creator_id)}
-                    disabled={Boolean(followLoadingByCreator[live.creator_id])}
-                    style={inlineActionButtonStyle}
-                  >
-                    {followLoadingByCreator[live.creator_id]
-                      ? "..."
-                      : followingByCreator[live.creator_id]
-                        ? "Ne plus suivre"
-                        : "Suivre"}
-                  </button>
                 ) : null}
                 {live.creator_id && live.creator_id === currentUserId ? (
                   <button
@@ -779,10 +815,10 @@ export default function WatchPage() {
                   <path d="M16 10.2L20 8V16L16 13.8V10.2Z" fill="#ef4444" />
                 </svg>
               </span>
-              <span style={goLiveLabelStyle}>Passer en live (créateur)</span>
+              <span style={goLiveLabelStyle}>{buttonLabels.goLiveCreatorLabel}</span>
             </Link>
             <Link href="/auth?mode=creator" style={{ ...actionStyle, background: "rgba(30,41,59,0.95)" }}>
-              Demander statut créateur
+              {buttonLabels.becomeCreatorLabel}
             </Link>
           </div>
         </section>
@@ -916,6 +952,14 @@ const inlineActionButtonStyle: CSSProperties = {
   color: "#fff",
   fontWeight: 700,
   cursor: "pointer",
+};
+
+const topFollowButtonStyle: CSSProperties = {
+  ...inlineActionButtonStyle,
+  padding: "7px 11px",
+  background: "rgba(37,99,235,0.25)",
+  border: "1px solid rgba(147,197,253,0.6)",
+  fontSize: 12,
 };
 
 const linkStyle: CSSProperties = {

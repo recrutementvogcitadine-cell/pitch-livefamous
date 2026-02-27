@@ -38,6 +38,21 @@ create index if not exists live_notification_events_created_idx
 create index if not exists live_notification_events_creator_idx
   on public.live_notification_events (creator_user_id);
 
+create table if not exists public.app_button_labels (
+  id integer primary key,
+  go_live_label text not null default 'Passer en live caméra',
+  go_live_creator_label text not null default 'Passer en live (créateur)',
+  become_creator_label text not null default 'Devenir créateur',
+  allow_agent_edit boolean not null default false,
+  updated_at timestamptz not null default now(),
+  created_at timestamptz not null default now(),
+  constraint app_button_labels_singleton check (id = 1)
+);
+
+insert into public.app_button_labels (id)
+values (1)
+on conflict (id) do nothing;
+
 -- Keep updated_at fresh on upserts/updates.
 create or replace function public.set_updated_at_timestamp()
 returns trigger

@@ -29,6 +29,15 @@ type LiveNotifyStats = {
   eventsTableMissing?: boolean;
 };
 
+type ButtonLabelSettings = {
+  goLiveLabel: string;
+  goLiveCreatorLabel: string;
+  becomeCreatorLabel: string;
+  allowAgentEdit: boolean;
+  currentRole?: AppRole;
+  error?: string;
+};
+
 const actionItems = [
   {
     href: "/settings/moderation",
@@ -67,6 +76,14 @@ export default function AdminDashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [loadingStats, setLoadingStats] = useState(true);
   const [notifyStats, setNotifyStats] = useState<LiveNotifyStats | null>(null);
+  const [loadingButtonLabels, setLoadingButtonLabels] = useState(true);
+  const [savingButtonLabels, setSavingButtonLabels] = useState(false);
+  const [buttonLabels, setButtonLabels] = useState<ButtonLabelSettings>({
+    goLiveLabel: "Passer en live caméra",
+    goLiveCreatorLabel: "Passer en live (créateur)",
+    becomeCreatorLabel: "Devenir créateur",
+    allowAgentEdit: false,
+  });
 
   const canAssignSuperAdmin = currentRole === "super_admin";
 
@@ -131,6 +148,74 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     void loadNotifyStats();
   }, []);
+
+  const loadButtonLabels = async () => {
+    setLoadingButtonLabels(true);
+    try {
+      const response = await fetch("/api/admin/button-labels", { cache: "no-store" });
+      const body = (await response.json()) as ButtonLabelSettings;
+      if (!response.ok) {
+        throw new Error(body.error ?? "Impossible de charger les labels des boutons.");
+      }
+      setButtonLabels((prev) => ({
+        ...prev,
+        goLiveLabel: body.goLiveLabel ?? prev.goLiveLabel,
+        goLiveCreatorLabel: body.goLiveCreatorLabel ?? prev.goLiveCreatorLabel,
+        becomeCreatorLabel: body.becomeCreatorLabel ?? prev.becomeCreatorLabel,
+        allowAgentEdit: Boolean(body.allowAgentEdit),
+      }));
+      if (body.currentRole) {
+        setCurrentRole(body.currentRole);
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoadingButtonLabels(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadButtonLabels();
+  }, []);
+
+  const saveButtonLabels = async () => {
+    setSavingButtonLabels(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const response = await fetch("/api/admin/button-labels", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          goLiveLabel: buttonLabels.goLiveLabel,
+          goLiveCreatorLabel: buttonLabels.goLiveCreatorLabel,
+          becomeCreatorLabel: buttonLabels.becomeCreatorLabel,
+          allowAgentEdit: buttonLabels.allowAgentEdit,
+        }),
+      });
+
+      const body = (await response.json()) as ButtonLabelSettings;
+      if (!response.ok) {
+        throw new Error(body.error ?? "Enregistrement impossible.");
+      }
+
+      setButtonLabels((prev) => ({
+        ...prev,
+        goLiveLabel: body.goLiveLabel ?? prev.goLiveLabel,
+        goLiveCreatorLabel: body.goLiveCreatorLabel ?? prev.goLiveCreatorLabel,
+        becomeCreatorLabel: body.becomeCreatorLabel ?? prev.becomeCreatorLabel,
+        allowAgentEdit: Boolean(body.allowAgentEdit),
+      }));
+      setMessage("Libellés des boutons mis à jour ✅");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSavingButtonLabels(false);
+    }
+  };
+
+  const canEditButtonLabels =
+    currentRole === "super_admin" || currentRole === "admin" || (currentRole === "agent" && buttonLabels.allowAgentEdit);
 
   const updateRole = async (userId: string) => {
     const role = draftRoles[userId];
@@ -255,6 +340,100 @@ export default function AdminDashboardPage() {
             <p style={{ margin: 0, color: "#92400e", fontSize: 13 }}>
               Historique d&apos;envoi indisponible: exécuter le SQL `live_notification_events` en prod.
             </p>
+          ) : null}
+        </section>
+
+        <section style={roleCardStyle}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <div>
+              <h2 style={{ margin: 0 }}>Personnalisation des boutons Live</h2>
+              <p style={{ margin: "6px 0 0", color: "#475569" }}>
+                Modifier les noms des boutons affichés aux spectateurs sur /watch.
+              </p>
+            </div>
+            <button type="button" onClick={() => void loadButtonLabels()} style={action3DDarkStyle}>
+              Rafraîchir
+            </button>
+          </div>
+
+          {loadingButtonLabels ? <p style={{ margin: 0 }}>Chargement des libellés...</p> : null}
+
+          {!loadingButtonLabels ? (
+            <div style={{ display: "grid", gap: 8 }}>
+              <label style={fieldLabelStyle}>
+                Bouton principal Live caméra
+                <input
+                  value={buttonLabels.goLiveLabel}
+                  onChange={(event) =>
+                    setButtonLabels((prev) => ({ ...prev, goLiveLabel: event.target.value }))
+                  }
+                  style={inputStyle}
+                  maxLength={80}
+                  disabled={!canEditButtonLabels || savingButtonLabels}
+                />
+              </label>
+
+              <label style={fieldLabelStyle}>
+                Bouton Live créateur (panneau caméra)
+                <input
+                  value={buttonLabels.goLiveCreatorLabel}
+                  onChange={(event) =>
+                    setButtonLabels((prev) => ({ ...prev, goLiveCreatorLabel: event.target.value }))
+                  }
+                  style={inputStyle}
+                  maxLength={80}
+                  disabled={!canEditButtonLabels || savingButtonLabels}
+                />
+              </label>
+
+              <label style={fieldLabelStyle}>
+                Bouton devenir créateur
+                <input
+                  value={buttonLabels.becomeCreatorLabel}
+                  onChange={(event) =>
+                    setButtonLabels((prev) => ({ ...prev, becomeCreatorLabel: event.target.value }))
+                  }
+                  style={inputStyle}
+                  maxLength={80}
+                  disabled={!canEditButtonLabels || savingButtonLabels}
+                />
+              </label>
+
+              <label style={{ display: "inline-flex", alignItems: "center", gap: 8, color: "#334155", fontWeight: 600 }}>
+                <input
+                  type="checkbox"
+                  checked={buttonLabels.allowAgentEdit}
+                  onChange={(event) =>
+                    setButtonLabels((prev) => ({ ...prev, allowAgentEdit: event.target.checked }))
+                  }
+                  disabled={currentRole !== "super_admin" || savingButtonLabels}
+                />
+                Autoriser les agents à modifier les libellés
+              </label>
+
+              {currentRole !== "super_admin" ? (
+                <p style={{ margin: 0, color: "#64748b", fontSize: 12 }}>
+                  Seul le propriétaire (super_admin) peut activer/désactiver l&apos;édition par les agents.
+                </p>
+              ) : null}
+
+              {!canEditButtonLabels ? (
+                <p style={{ margin: 0, color: "#92400e", fontSize: 13 }}>
+                  Édition bloquée pour ce rôle. Le propriétaire peut autoriser les agents depuis cette section.
+                </p>
+              ) : null}
+
+              <div>
+                <button
+                  type="button"
+                  onClick={() => void saveButtonLabels()}
+                  style={action3DPrimaryStyle}
+                  disabled={!canEditButtonLabels || savingButtonLabels}
+                >
+                  {savingButtonLabels ? "Enregistrement..." : "Enregistrer les libellés"}
+                </button>
+              </div>
+            </div>
           ) : null}
         </section>
 
@@ -450,4 +629,21 @@ const metricValueStyle: CSSProperties = {
   color: "#0f172a",
   fontSize: 22,
   lineHeight: 1,
+};
+
+const fieldLabelStyle: CSSProperties = {
+  display: "grid",
+  gap: 6,
+  color: "#334155",
+  fontWeight: 700,
+  fontSize: 13,
+};
+
+const inputStyle: CSSProperties = {
+  border: "1px solid #cbd5e1",
+  borderRadius: 10,
+  padding: "9px 10px",
+  fontSize: 14,
+  color: "#0f172a",
+  background: "#fff",
 };
