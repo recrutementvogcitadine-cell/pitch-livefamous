@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, type CSSProperties, type UIEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type UIEvent } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { useAppLogo } from "../components/app-logo";
 import LiveNotificationControls from "../components/LiveNotificationControls";
@@ -54,6 +54,11 @@ export default function WatchPage() {
   const [followLoadingByCreator, setFollowLoadingByCreator] = useState<Record<string, boolean>>({});
   const [notifyByLive, setNotifyByLive] = useState<Record<string, string>>({});
   const [notifyLoadingByLive, setNotifyLoadingByLive] = useState<Record<string, boolean>>({});
+  const [previewLiveId, setPreviewLiveId] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewStream, setPreviewStream] = useState<MediaStream | null>(null);
+  const previewVideoRef = useRef<HTMLVideoElement | null>(null);
   const appLogo = useAppLogo();
   const followedLivesCount = useMemo(
     () =>
@@ -154,6 +159,20 @@ export default function WatchPage() {
     void loadFollowState();
   }, [lives]);
 
+  useEffect(() => {
+    if (!previewVideoRef.current || !previewStream) return;
+    previewVideoRef.current.srcObject = previewStream;
+  }, [previewStream]);
+
+  useEffect(() => {
+    return () => {
+      if (!previewStream) return;
+      for (const track of previewStream.getTracks()) {
+        track.stop();
+      }
+    };
+  }, [previewStream]);
+
   const onReachEnd = async (event: UIEvent<HTMLDivElement>) => {
     if (!hasMore || loading) return;
     const target = event.currentTarget;
@@ -164,6 +183,49 @@ export default function WatchPage() {
       await loadLives(offset, true);
     } catch (err: unknown) {
       setError(toDisplayErrorMessage(err));
+    }
+  };
+
+  const closeCameraPreview = () => {
+    if (previewStream) {
+      for (const track of previewStream.getTracks()) {
+        track.stop();
+      }
+    }
+    setPreviewStream(null);
+    setPreviewLiveId(null);
+    setPreviewLoading(false);
+    setPreviewError(null);
+  };
+
+  const openCameraPreview = async (liveId: string) => {
+    if (previewLiveId === liveId && previewStream) {
+      closeCameraPreview();
+      return;
+    }
+
+    closeCameraPreview();
+    setPreviewLoading(true);
+    setPreviewError(null);
+    setPreviewLiveId(liveId);
+
+    if (typeof window === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+      setPreviewError("Caméra non disponible sur cet appareil.");
+      setPreviewLoading(false);
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user" },
+        audio: true,
+      });
+      setPreviewStream(stream);
+    } catch (err: unknown) {
+      setPreviewError(toDisplayErrorMessage(err));
+      setPreviewLiveId(null);
+    } finally {
+      setPreviewLoading(false);
     }
   };
 
@@ -569,6 +631,17 @@ export default function WatchPage() {
                 </Link>
                 {live.creator_id && live.creator_id !== currentUserId ? (
                   <>
+                    <button
+                      type="button"
+                      onClick={() => void openCameraPreview(live.id)}
+                      style={inlineActionButtonStyle}
+                    >
+                      {previewLoading && previewLiveId === live.id
+                        ? "Activation caméra..."
+                        : previewLiveId === live.id && previewStream
+                          ? "Masquer ma caméra"
+                          : "Afficher ma caméra"}
+                    </button>
                     <Link href="/agora-test" style={{ ...actionStyle, background: "rgba(14,116,144,0.9)" }}>
                       Passer en live caméra
                     </Link>
@@ -673,6 +746,27 @@ export default function WatchPage() {
           </section>
         ) : null}
       </div>
+
+      {previewLiveId ? (
+        <section style={cameraPreviewPanelStyle}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+            <strong style={{ fontSize: 13 }}>Prévisualisation caméra spectateur</strong>
+            <button type="button" onClick={closeCameraPreview} style={cameraCloseButtonStyle}>
+              ✕
+            </button>
+          </div>
+          <video ref={previewVideoRef} autoPlay playsInline muted style={cameraVideoStyle} />
+          {previewError ? <p style={{ margin: 0, color: "#fecaca", fontSize: 12 }}>Erreur caméra: {previewError}</p> : null}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <Link href="/agora-test" style={{ ...actionStyle, background: "rgba(14,116,144,0.95)" }}>
+              Passer en live (créateur)
+            </Link>
+            <Link href="/auth?mode=creator" style={{ ...actionStyle, background: "rgba(30,41,59,0.95)" }}>
+              Demander statut créateur
+            </Link>
+          </div>
+        </section>
+      ) : null}
     </main>
   );
 }
@@ -980,6 +1074,42 @@ const logoutButtonStyle: CSSProperties = {
   fontWeight: 700,
   cursor: "pointer",
   backdropFilter: "blur(5px)",
+};
+
+const cameraPreviewPanelStyle: CSSProperties = {
+  position: "fixed",
+  left: 14,
+  right: 14,
+  bottom: 14,
+  zIndex: 30,
+  borderRadius: 12,
+  border: "1px solid rgba(255,255,255,0.22)",
+  background: "rgba(2,6,23,0.92)",
+  color: "#fff",
+  padding: 10,
+  display: "grid",
+  gap: 8,
+  maxWidth: 560,
+  margin: "0 auto",
+};
+
+const cameraVideoStyle: CSSProperties = {
+  width: "100%",
+  maxHeight: 220,
+  borderRadius: 10,
+  border: "1px solid rgba(148,163,184,0.35)",
+  background: "#0f172a",
+  objectFit: "cover",
+};
+
+const cameraCloseButtonStyle: CSSProperties = {
+  border: "1px solid rgba(255,255,255,0.25)",
+  borderRadius: 8,
+  background: "rgba(30,41,59,0.9)",
+  color: "#fff",
+  width: 28,
+  height: 28,
+  cursor: "pointer",
 };
 
 function isCreatorCertified(live: LiveRow) {
