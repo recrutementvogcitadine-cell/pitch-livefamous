@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent, type UIEvent } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { useAppLogo } from "../components/app-logo";
@@ -39,6 +40,8 @@ type WatchButtonLabels = {
 const PAGE_SIZE = 8;
 
 export default function WatchPage() {
+  const searchParams = useSearchParams();
+  const startLiveId = searchParams.get("startLiveId")?.trim() || null;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lives, setLives] = useState<LiveRow[]>([]);
@@ -107,7 +110,16 @@ export default function WatchPage() {
     }
 
     const rows = Array.isArray(body.rows) ? body.rows : [];
-    setLives((prev) => (append ? [...prev, ...rows] : rows));
+    const orderedRows =
+      !append && startLiveId
+        ? (() => {
+            const picked = rows.find((item) => item.id === startLiveId);
+            if (!picked) return rows;
+            return [picked, ...rows.filter((item) => item.id !== startLiveId)];
+          })()
+        : rows;
+
+    setLives((prev) => (append ? [...prev, ...orderedRows] : orderedRows));
     setOffset(nextOffset + rows.length);
     setHasMore(rows.length === PAGE_SIZE);
   };
@@ -291,7 +303,7 @@ export default function WatchPage() {
       return;
     }
 
-    window.location.href = `/lives/${live.id}`;
+    window.location.href = `/watch?startLiveId=${encodeURIComponent(live.id)}`;
   };
 
   const getAuthHeaders = async (): Promise<Record<string, string>> => {
