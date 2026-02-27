@@ -552,9 +552,9 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
               opacity: chatSending || !chatInput.trim() ? 0.7 : 1,
             }}
           >
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M5 12H19" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
-              <path d="M13 6L19 12L13 18" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M12 19V7" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" />
+              <path d="M6.8 12.2L12 7L17.2 12.2" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
         </form>
