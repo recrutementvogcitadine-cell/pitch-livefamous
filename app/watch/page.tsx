@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, type CSSProperties, type UIEvent } from "react";
+import { useEffect, useMemo, useState, type CSSProperties, type UIEvent } from "react";
+import { createClient } from "@supabase/supabase-js";
 import { useAppLogo } from "../components/app-logo";
 
 type LiveRow = {
@@ -46,7 +47,15 @@ export default function WatchPage() {
   const [aiNextSendAtByLive, setAiNextSendAtByLive] = useState<Record<string, number>>({});
   const [aiAgentByLive, setAiAgentByLive] = useState<Record<string, LiveAiAgent | null>>({});
   const [aiActiveAgentsByLive, setAiActiveAgentsByLive] = useState<Record<string, LiveAiAgent[]>>({});
+  const [signingOut, setSigningOut] = useState(false);
   const appLogo = useAppLogo();
+
+  const client = useMemo(() => {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!url || !key) return null;
+    return createClient(url, key);
+  }, []);
 
   const loadLives = async (nextOffset: number, append: boolean) => {
     const response = await fetch(
@@ -280,6 +289,16 @@ export default function WatchPage() {
     }
   };
 
+  const onSignOut = async () => {
+    if (!client || signingOut) return;
+    setSigningOut(true);
+    try {
+      await client.auth.signOut();
+    } finally {
+      window.location.href = "/auth";
+    }
+  };
+
   if (loading) {
     return <main style={centerStyle}>Chargement du flux live…</main>;
   }
@@ -308,6 +327,9 @@ export default function WatchPage() {
 
   return (
     <main style={{ height: "100vh", overflow: "hidden", background: "#000", fontFamily: "system-ui, sans-serif" }}>
+      <button type="button" onClick={() => void onSignOut()} disabled={signingOut} style={logoutButtonStyle}>
+        {signingOut ? "Déconnexion..." : "Se déconnecter"}
+      </button>
       <Link href="/" style={homeButtonStyle}>
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <path d="M3 10.5L12 3L21 10.5V20C21 20.5523 20.5523 21 20 21H14.5V14.5H9.5V21H4C3.44772 21 3 20.5523 3 20V10.5Z" fill="currentColor" />
@@ -700,6 +722,21 @@ const srOnlyStyle: CSSProperties = {
   clip: "rect(0, 0, 0, 0)",
   whiteSpace: "nowrap",
   border: 0,
+};
+
+const logoutButtonStyle: CSSProperties = {
+  position: "fixed",
+  right: 14,
+  top: 14,
+  zIndex: 25,
+  border: "1px solid rgba(255,255,255,0.22)",
+  borderRadius: 999,
+  padding: "8px 12px",
+  background: "rgba(15, 23, 42, 0.78)",
+  color: "#fff",
+  fontWeight: 700,
+  cursor: "pointer",
+  backdropFilter: "blur(5px)",
 };
 
 function isCreatorCertified(live: LiveRow) {

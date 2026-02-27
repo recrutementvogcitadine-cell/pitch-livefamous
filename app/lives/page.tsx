@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { createClient } from "@supabase/supabase-js";
 
 type LiveRow = {
   id: string;
@@ -20,6 +21,14 @@ export default function LivesPage() {
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [showingLiveOnly, setShowingLiveOnly] = useState(true);
+  const [signingOut, setSigningOut] = useState(false);
+
+  const client = useMemo(() => {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!url || !key) return null;
+    return createClient(url, key);
+  }, []);
 
   const loadPage = async (nextOffset: number, append: boolean, liveOnly: boolean) => {
     const response = await fetch(
@@ -80,6 +89,16 @@ export default function LivesPage() {
     }
   };
 
+  const onSignOut = async () => {
+    if (!client || signingOut) return;
+    setSigningOut(true);
+    try {
+      await client.auth.signOut();
+    } finally {
+      window.location.href = "/auth";
+    }
+  };
+
   return (
     <main style={{ maxWidth: 980, margin: "0 auto", padding: 24, fontFamily: "system-ui, sans-serif" }}>
       <header style={{ marginBottom: 16 }}>
@@ -96,6 +115,9 @@ export default function LivesPage() {
         <Link href="/agora-test" style={pillStyle}>
           Ouvrir Agora test
         </Link>
+        <button type="button" onClick={() => void onSignOut()} disabled={signingOut} style={pillStyleButton}>
+          {signingOut ? "Déconnexion..." : "Se déconnecter"}
+        </button>
       </div>
 
       {loading ? <p>Chargement des lives...</p> : null}
