@@ -568,6 +568,16 @@ export default function WatchPage() {
                   Voir tous les lives
                 </Link>
                 {live.creator_id && live.creator_id !== currentUserId ? (
+                  <>
+                    <Link href="/agora-test" style={{ ...actionStyle, background: "rgba(14,116,144,0.9)" }}>
+                      Passer en live caméra
+                    </Link>
+                    <Link href="/auth?mode=creator" style={{ ...actionStyle, background: "rgba(30,41,59,0.9)" }}>
+                      Devenir créateur
+                    </Link>
+                  </>
+                ) : null}
+                {live.creator_id && live.creator_id !== currentUserId ? (
                   <button
                     type="button"
                     onClick={() => void toggleFollow(live.creator_id)}
