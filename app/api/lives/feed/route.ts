@@ -16,8 +16,18 @@ type LiveRow = {
 function normalizeWhatsapp(value: unknown) {
   if (typeof value !== "string") return null;
   const cleaned = value.replace(/[^\d+]/g, "").trim();
-  if (!cleaned) return null;
+  const digitsOnly = cleaned.replace(/\D/g, "");
+  if (digitsOnly.length < 8) return null;
   return cleaned.slice(0, 30);
+}
+
+function pickCreatorWhatsapp(metadata: Record<string, unknown>) {
+  return (
+    normalizeWhatsapp(metadata.creator_whatsapp) ??
+    normalizeWhatsapp(metadata.whatsapp) ??
+    normalizeWhatsapp(metadata.phone) ??
+    normalizeWhatsapp(metadata.phone_number)
+  );
 }
 
 async function getAuthenticatedUser(req: Request) {
@@ -123,7 +133,7 @@ export async function GET(req: Request) {
         }
 
         const metadata = (userData.user.user_metadata ?? {}) as Record<string, unknown>;
-        whatsappByCreator[creatorId] = normalizeWhatsapp(metadata.creator_whatsapp);
+        whatsappByCreator[creatorId] = pickCreatorWhatsapp(metadata);
       } catch {
         whatsappByCreator[creatorId] = null;
       }

@@ -749,7 +749,9 @@ export default function WatchPage() {
                       >
                         WhatsApp créateur
                       </a>
-                    ) : null}
+                    ) : (
+                      <span style={whatsappUnavailableStyle}>WhatsApp indisponible</span>
+                    )}
                   </>
                 ) : null}
                 {live.creator_id && live.creator_id === currentUserId ? (
@@ -977,6 +979,15 @@ const whatsappActionStyle: CSSProperties = {
   background: "#16a34a",
   border: "1px solid rgba(255,255,255,0.28)",
   boxShadow: "0 8px 18px rgba(22,163,74,0.35)",
+};
+
+const whatsappUnavailableStyle: CSSProperties = {
+  ...actionStyle,
+  background: "rgba(100,116,139,0.65)",
+  border: "1px solid rgba(148,163,184,0.55)",
+  boxShadow: "none",
+  cursor: "not-allowed",
+  opacity: 0.85,
 };
 
 const newBadgeStyle: CSSProperties = {
