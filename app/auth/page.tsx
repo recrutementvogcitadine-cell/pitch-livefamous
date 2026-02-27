@@ -101,7 +101,8 @@ export default function AuthPage() {
           window.location.href = "/watch";
           return;
         }
-        setMessage("Connexion réussie. Vous pouvez maintenant accéder aux fonctionnalités privées.");
+        window.location.href = "/lives";
+        return;
       } else if (mode === "signup") {
         const redirectTo = typeof window !== "undefined" ? `${window.location.origin}/` : undefined;
         const { error: signUpError } = await client.auth.signUp({
