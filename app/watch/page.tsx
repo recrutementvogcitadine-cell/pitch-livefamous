@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, type CSSProperties, type UIEvent } from "react";
-import { createClient } from "@supabase/supabase-js";
+import { useEffect, useState, type CSSProperties, type UIEvent } from "react";
 import { useAppLogo } from "../components/app-logo";
 
 type LiveRow = {
@@ -49,25 +48,24 @@ export default function WatchPage() {
   const [aiActiveAgentsByLive, setAiActiveAgentsByLive] = useState<Record<string, LiveAiAgent[]>>({});
   const appLogo = useAppLogo();
 
-  const client = useMemo(() => {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    if (!url || !key) return null;
-    return createClient(url, key);
-  }, []);
-
   const loadLives = async (nextOffset: number, append: boolean) => {
-    if (!client) return;
-    const { data, error: queryError } = await client
-      .from("lives")
-      .select("*")
-      .eq("status", "live")
-      .order("created_at", { ascending: false })
-      .range(nextOffset, nextOffset + PAGE_SIZE - 1);
+    const response = await fetch(
+      `/api/lives/feed?offset=${encodeURIComponent(String(nextOffset))}&limit=${encodeURIComponent(String(PAGE_SIZE))}`,
+      { cache: "no-store" }
+    );
 
-    if (queryError) throw queryError;
+    if (response.status === 401) {
+      window.location.href = "/auth";
+      return;
+    }
 
-    const rows = (data ?? []) as LiveRow[];
+    const body = (await response.json()) as { rows?: LiveRow[]; error?: string };
+
+    if (!response.ok) {
+      throw new Error(body.error ?? "live feed fetch failed");
+    }
+
+    const rows = Array.isArray(body.rows) ? body.rows : [];
     setLives((prev) => (append ? [...prev, ...rows] : rows));
     setOffset(nextOffset + rows.length);
     setHasMore(rows.length === PAGE_SIZE);
@@ -78,20 +76,7 @@ export default function WatchPage() {
       setLoading(true);
       setError(null);
 
-      if (!client) {
-        setError("Configuration Supabase manquante.");
-        setLoading(false);
-        return;
-      }
-
       try {
-        const { data } = await client.auth.getUser();
-        const user = data.user;
-        if (!user) {
-          window.location.href = "/auth";
-          return;
-        }
-
         await loadLives(0, false);
       } catch (err: unknown) {
         setError(toDisplayErrorMessage(err));
@@ -102,7 +87,7 @@ export default function WatchPage() {
 
     void init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [client]);
+  }, []);
 
   const onReachEnd = async (event: UIEvent<HTMLDivElement>) => {
     if (!hasMore || loading) return;
