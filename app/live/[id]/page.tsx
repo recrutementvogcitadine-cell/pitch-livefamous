@@ -391,7 +391,7 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
 
   const sendChatMessage = async () => {
     const text = chatInput.trim();
-    if (!text || !chatChannelRef.current || chatSending) return;
+    if (!text || chatSending) return;
     setChatSending(true);
 
     const message: LiveChatMessage = {
@@ -402,11 +402,15 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
     };
 
     try {
-      await chatChannelRef.current.send({
-        type: "broadcast",
-        event: "chat-message",
-        payload: message,
-      });
+      if (chatChannelRef.current) {
+        await chatChannelRef.current.send({
+          type: "broadcast",
+          event: "chat-message",
+          payload: message,
+        });
+      } else {
+        setChatMessages((prev) => [...prev, message].slice(-30));
+      }
       setChatInput("");
 
       if (!resolvedId || aiReplying) return;
@@ -438,11 +442,15 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
           createdAt: Date.now(),
         };
 
-        await chatChannelRef.current.send({
-          type: "broadcast",
-          event: "chat-message",
-          payload: assistantMessage,
-        });
+        if (chatChannelRef.current) {
+          await chatChannelRef.current.send({
+            type: "broadcast",
+            event: "chat-message",
+            payload: assistantMessage,
+          });
+        } else {
+          setChatMessages((prev) => [...prev, assistantMessage].slice(-30));
+        }
 
         const assistantTurn: LocalHistoryItem = { role: "assistant", content: finalReplyText.slice(0, 500) };
         const withAssistant: LocalHistoryItem[] = [...nextHistory, assistantTurn].slice(-12);
@@ -457,11 +465,15 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
         };
 
         try {
-          await chatChannelRef.current.send({
-            type: "broadcast",
-            event: "chat-message",
-            payload: fallbackMessage,
-          });
+          if (chatChannelRef.current) {
+            await chatChannelRef.current.send({
+              type: "broadcast",
+              event: "chat-message",
+              payload: fallbackMessage,
+            });
+          } else {
+            setChatMessages((prev) => [...prev, fallbackMessage].slice(-30));
+          }
         } catch {}
 
         const assistantTurn: LocalHistoryItem = { role: "assistant", content: fallbackText.slice(0, 500) };
