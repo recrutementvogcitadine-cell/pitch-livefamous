@@ -301,7 +301,7 @@ export default function WatchPage() {
       return;
     }
 
-    const nextUrl = `/lives/${encodeURIComponent(live.id)}`;
+    const nextUrl = `/live/${encodeURIComponent(live.id)}`;
     window.location.replace(nextUrl);
   };
 

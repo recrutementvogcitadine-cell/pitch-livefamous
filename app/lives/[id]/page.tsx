@@ -10,5 +10,5 @@ export default async function LiveDetailsPage({ params }: { params: PageParams }
     redirect("/lives");
   }
 
-  redirect(`/agora-test?channel=${encodeURIComponent(id)}&autojoin=spectator`);
+  redirect(`/live/${encodeURIComponent(id)}`);
 }
