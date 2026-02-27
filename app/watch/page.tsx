@@ -689,7 +689,7 @@ export default function WatchPage() {
                           ? "Masquer ma caméra"
                           : "Afficher ma caméra"}
                     </button>
-                    <Link href="/agora-test" style={goLiveActionStyle}>
+                    <Link href="/auth?mode=creator" style={goLiveActionStyle}>
                       <span style={newBadgeStyle}>NOUVEAU</span>
                       <span style={cameraIconBadgeStyle} aria-hidden="true">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
@@ -701,9 +701,6 @@ export default function WatchPage() {
                         </svg>
                       </span>
                       <span style={goLiveLabelStyle}>{buttonLabels.goLiveLabel}</span>
-                    </Link>
-                    <Link href="/auth?mode=creator" style={{ ...actionStyle, background: "rgba(30,41,59,0.9)" }}>
-                      {buttonLabels.becomeCreatorLabel}
                     </Link>
                   </>
                 ) : null}
@@ -800,7 +797,7 @@ export default function WatchPage() {
           <video ref={previewVideoRef} autoPlay playsInline muted style={cameraVideoStyle} />
           {previewError ? <p style={{ margin: 0, color: "#fecaca", fontSize: 12 }}>Erreur caméra: {previewError}</p> : null}
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <Link href="/agora-test" style={goLiveActionStyle}>
+            <Link href="/auth?mode=creator" style={goLiveActionStyle}>
               <span style={newBadgeStyle}>NOUVEAU</span>
               <span style={cameraIconBadgeStyle} aria-hidden="true">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
@@ -812,9 +809,6 @@ export default function WatchPage() {
                 </svg>
               </span>
               <span style={goLiveLabelStyle}>{buttonLabels.goLiveCreatorLabel}</span>
-            </Link>
-            <Link href="/auth?mode=creator" style={{ ...actionStyle, background: "rgba(30,41,59,0.95)" }}>
-              {buttonLabels.becomeCreatorLabel}
             </Link>
           </div>
         </section>
