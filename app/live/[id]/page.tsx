@@ -533,22 +533,29 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
             type="submit"
             onClick={() => void sendChatMessage()}
             disabled={chatSending || !chatInput.trim()}
+            aria-label="Envoyer"
             style={{
               borderRadius: 999,
               border: "1px solid rgba(147,197,253,0.55)",
-              width: 92,
-              minWidth: 92,
-              padding: "10px 12px",
+              width: 42,
+              minWidth: 42,
+              height: 42,
+              padding: 0,
               background: "rgba(37,99,235,0.88)",
               color: "#fff",
               fontWeight: 700,
               whiteSpace: "nowrap",
+              display: "grid",
+              placeItems: "center",
               flexShrink: 0,
               cursor: chatSending || !chatInput.trim() ? "not-allowed" : "pointer",
               opacity: chatSending || !chatInput.trim() ? 0.7 : 1,
             }}
           >
-            Envoyer
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M5 12H19" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+              <path d="M13 6L19 12L13 18" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </button>
         </form>
       </section>
