@@ -44,6 +44,9 @@ export default function LiveNotificationControls() {
 
       if (!user) throw new Error("Connectez-vous pour activer les notifications.");
       if (!("serviceWorker" in navigator)) throw new Error("Service Worker non supporté sur cet appareil.");
+      if (typeof Notification === "undefined") {
+        throw new Error("Notifications non supportées sur cet appareil/navigateur.");
+      }
 
       const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
       if (!publicKey) throw new Error("NEXT_PUBLIC_VAPID_PUBLIC_KEY manquant.");
