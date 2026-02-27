@@ -31,23 +31,23 @@ export default function LivesPage() {
   }, []);
 
   const loadPage = async (nextOffset: number, append: boolean, liveOnly: boolean) => {
-    const response = await fetch(
-      `/api/lives/feed?offset=${encodeURIComponent(String(nextOffset))}&limit=${encodeURIComponent(String(PAGE_SIZE))}&liveOnly=${liveOnly ? "true" : "false"}`,
-      { cache: "no-store" }
-    );
-
-    if (response.status === 401) {
-      window.location.href = "/auth";
-      return 0;
+    if (!client) {
+      throw new Error("Variables Supabase manquantes.");
     }
 
-    const body = (await response.json()) as { rows?: LiveRow[]; error?: string };
+    const query = client
+      .from("lives")
+      .select("id,title,status,created_at")
+      .order("created_at", { ascending: false })
+      .range(nextOffset, nextOffset + PAGE_SIZE - 1);
 
-    if (!response.ok) {
-      throw new Error(body.error ?? "lives fetch failed");
+    const { data, error: queryError } = liveOnly ? await query.eq("status", "live") : await query;
+
+    if (queryError) {
+      throw queryError;
     }
 
-    const rows = Array.isArray(body.rows) ? body.rows : [];
+    const rows = (data ?? []) as LiveRow[];
     setLives((prev) => (append ? [...prev, ...rows] : rows));
     setOffset(nextOffset + rows.length);
     setHasMore(rows.length === PAGE_SIZE);
@@ -60,7 +60,19 @@ export default function LivesPage() {
       setLoading(true);
       setError(null);
 
+      if (!client) {
+        setError("Variables Supabase manquantes.");
+        setLoading(false);
+        return;
+      }
+
       try {
+        const { data } = await client.auth.getUser();
+        if (!data.user) {
+          window.location.href = "/auth";
+          return;
+        }
+
         const liveCount = await loadPage(0, false, true);
         if (liveCount === 0) {
           await loadPage(0, false, false);
@@ -74,7 +86,7 @@ export default function LivesPage() {
 
     void init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [client]);
 
   const loadMore = async () => {
     if (loadingMore || !hasMore) return;
