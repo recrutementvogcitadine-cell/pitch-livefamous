@@ -673,9 +673,11 @@ export default function WatchPage() {
                 {live.created_at ? new Date(live.created_at).toLocaleString("fr-FR") : "En cours"}
               </p>
               <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <Link href={`/lives/${live.id}`} style={actionStyle}>
-                  Ouvrir ce live
-                </Link>
+                {live.creator_id && live.creator_id === currentUserId ? (
+                  <Link href={`/lives/${live.id}`} style={actionStyle}>
+                    Ouvrir ce live
+                  </Link>
+                ) : null}
                 <Link href="/lives" style={{ ...actionStyle, background: "rgba(255,255,255,0.18)" }}>
                   Voir tous les lives
                 </Link>
