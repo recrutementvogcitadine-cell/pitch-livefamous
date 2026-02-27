@@ -379,30 +379,6 @@ export default function AdminDashboardPage() {
           <img src={appLogo} alt="Logo app" width={38} height={38} style={{ borderRadius: 10, border: "1px solid #bfdbfe", background: "#fff" }} />
           <span style={{ color: "#1e3a8a", fontWeight: 700, fontSize: 13 }}>Dashboard Propriétaire</span>
         </div>
-        <p style={{ margin: 0, color: "#475569" }}>
-          Interface centrale pour piloter la modération, l&apos;opération live et les contrôles qualité production.
-        </p>
-
-        <section style={gridStyle}>
-          {actionItems.map((item) => (
-            <article key={item.href} style={panelStyle}>
-              <h2 style={{ margin: 0, fontSize: 18 }}>{item.title}</h2>
-              <p style={{ margin: 0, color: "#475569", lineHeight: 1.45 }}>{item.description}</p>
-              <Link href={item.href} style={item.tone === "primary" ? action3DPrimaryStyle : action3DDarkStyle}>
-                Ouvrir
-              </Link>
-            </article>
-          ))}
-        </section>
-
-        <section style={statusBoxStyle}>
-          <div style={{ fontWeight: 700 }}>Contrôle rapide recommandé</div>
-          <ul style={{ margin: "6px 0 0", paddingLeft: 18, color: "#334155" }}>
-            <li>Vérifier /api/health avant toute opération</li>
-            <li>Confirmer /api/agora/token pour la disponibilité RTC</li>
-            <li>Tester un message IA Live sur /watch après chaque déploiement</li>
-          </ul>
-        </section>
 
         <section style={liveRealtimeCardStyle}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
@@ -427,6 +403,31 @@ export default function AdminDashboardPage() {
               <strong style={bigCounterValueStyle}>{realtimeSpectators}</strong>
             </article>
           </div>
+        </section>
+
+        <p style={{ margin: 0, color: "#475569" }}>
+          Interface centrale pour piloter la modération, l&apos;opération live et les contrôles qualité production.
+        </p>
+
+        <section style={gridStyle}>
+          {actionItems.map((item) => (
+            <article key={item.href} style={panelStyle}>
+              <h2 style={{ margin: 0, fontSize: 18 }}>{item.title}</h2>
+              <p style={{ margin: 0, color: "#475569", lineHeight: 1.45 }}>{item.description}</p>
+              <Link href={item.href} style={item.tone === "primary" ? action3DPrimaryStyle : action3DDarkStyle}>
+                Ouvrir
+              </Link>
+            </article>
+          ))}
+        </section>
+
+        <section style={statusBoxStyle}>
+          <div style={{ fontWeight: 700 }}>Contrôle rapide recommandé</div>
+          <ul style={{ margin: "6px 0 0", paddingLeft: 18, color: "#334155" }}>
+            <li>Vérifier /api/health avant toute opération</li>
+            <li>Confirmer /api/agora/token pour la disponibilité RTC</li>
+            <li>Tester un message IA Live sur /watch après chaque déploiement</li>
+          </ul>
         </section>
 
         <section style={roleCardStyle}>
