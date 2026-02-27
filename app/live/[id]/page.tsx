@@ -34,6 +34,11 @@ type LiveChatMessage = {
   createdAt: number;
 };
 
+type LocalHistoryItem = {
+  role: "user" | "assistant";
+  content: string;
+};
+
 export default function LiveViewerPage({ params }: { params: PageParams }) {
   const [status, setStatus] = useState("Connexion au live...");
   const [resolvedId, setResolvedId] = useState("");
@@ -46,6 +51,8 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
   const [chatMessages, setChatMessages] = useState<LiveChatMessage[]>([]);
   const [chatAuthor, setChatAuthor] = useState("@spectateur");
   const [chatSending, setChatSending] = useState(false);
+  const [aiReplying, setAiReplying] = useState(false);
+  const [aiHistory, setAiHistory] = useState<LocalHistoryItem[]>([]);
   const chatInputRef = useRef<HTMLInputElement | null>(null);
   const remoteVideoRef = useRef<HTMLDivElement | null>(null);
   const clientRef = useRef<AgoraClient | null>(null);
@@ -355,6 +362,53 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
         payload: message,
       });
       setChatInput("");
+
+      if (!resolvedId || aiReplying) return;
+      setAiReplying(true);
+
+      const userTurn: LocalHistoryItem = { role: "user", content: text.slice(0, 500) };
+      const nextHistory: LocalHistoryItem[] = [...aiHistory, userTurn].slice(-12);
+
+      try {
+        const replyRes = await fetch("/api/live-ai/reply", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            liveId: resolvedId,
+            message: text,
+            history: nextHistory,
+          }),
+        });
+
+        const replyBody = (await replyRes.json()) as { reply?: string; error?: string };
+        const replyText = (replyBody.reply || "").trim();
+
+        if (!replyRes.ok || !replyText) {
+          setAiHistory(nextHistory);
+          return;
+        }
+
+        const assistantMessage: LiveChatMessage = {
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          text: replyText.slice(0, 220),
+          author: "@akoua_ia",
+          createdAt: Date.now(),
+        };
+
+        await chatChannelRef.current.send({
+          type: "broadcast",
+          event: "chat-message",
+          payload: assistantMessage,
+        });
+
+        const assistantTurn: LocalHistoryItem = { role: "assistant", content: replyText.slice(0, 500) };
+        const withAssistant: LocalHistoryItem[] = [...nextHistory, assistantTurn].slice(-12);
+        setAiHistory(withAssistant);
+      } catch {
+        setAiHistory(nextHistory);
+      } finally {
+        setAiReplying(false);
+      }
     } finally {
       setChatSending(false);
     }
