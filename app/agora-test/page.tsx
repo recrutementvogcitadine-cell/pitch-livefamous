@@ -26,6 +26,16 @@ type AgoraSDK = {
   ) => Promise<[AgoraTrack, AgoraTrack]>;
 };
 
+function normalizeWhatsapp(value: unknown) {
+  if (typeof value !== "string") return "";
+  return value.replace(/[^\d+]/g, "").trim();
+}
+
+function isValidWhatsapp(value: string) {
+  const digitsOnly = value.replace(/\D/g, "");
+  return digitsOnly.length >= 8;
+}
+
 const RESOLUTIONS: ResolutionOption[] = [
   { label: "QVGA (320x240)", width: 320, height: 240, fps: 15 },
   { label: "VGA (640x480)", width: 640, height: 480, fps: 15 },
@@ -73,9 +83,16 @@ export default function AgoraTestPage() {
       meta.account_type === "creator_pending" ||
       meta.account_type === "seller";
     const creatorVerified = Boolean(meta.creator_verified) || Boolean(meta.seller_active);
+    const creatorWhatsapp = normalizeWhatsapp(meta.creator_whatsapp);
 
     if (!isCreator || !creatorVerified) {
       setStatus("Pour passer en live caméra, demandez le mode créateur puis attendez la validation admin.");
+      setUpgradeRequired(true);
+      return false;
+    }
+
+    if (!isValidWhatsapp(creatorWhatsapp)) {
+      setStatus("WhatsApp obligatoire: renseignez un numéro valide dans votre profil créateur avant de passer en live.");
       setUpgradeRequired(true);
       return false;
     }

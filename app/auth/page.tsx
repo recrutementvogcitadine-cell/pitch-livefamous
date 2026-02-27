@@ -20,6 +20,15 @@ type UserState = {
   creatorPlan?: string;
 };
 
+function normalizeWhatsapp(value: string) {
+  return value.replace(/[^\d+]/g, "").trim();
+}
+
+function isValidWhatsapp(value: string) {
+  const digitsOnly = value.replace(/\D/g, "");
+  return digitsOnly.length >= 8;
+}
+
 export default function AuthPage() {
   const [mode, setMode] = useState<AuthMode>("signin");
   const [email, setEmail] = useState("");
@@ -139,8 +148,12 @@ export default function AuthPage() {
         if (signUpError) throw signUpError;
         setMessage("Inscription spectateur envoyée. Vérifiez votre email pour confirmer votre compte.");
       } else {
-        if (!creatorWhatsapp.trim()) {
+        const normalizedWhatsapp = normalizeWhatsapp(creatorWhatsapp);
+        if (!normalizedWhatsapp) {
           throw new Error("Numéro WhatsApp requis pour le profil créateur.");
+        }
+        if (!isValidWhatsapp(normalizedWhatsapp)) {
+          throw new Error("Numéro WhatsApp invalide. Utilisez un numéro avec indicatif (ex: +2250700000000).");
         }
         if (!creatorInfo.trim()) {
           throw new Error("Veuillez renseigner vos informations créateur pour la validation admin.");
@@ -160,7 +173,7 @@ export default function AuthPage() {
             creator_promo_mode: promoInfo.active ? promoInfo.mode : null,
             creator_promo_discount_percent: promoInfo.discountPercent ?? null,
             creator_promo_label: promoInfo.label,
-            creator_whatsapp: creatorWhatsapp.trim(),
+            creator_whatsapp: normalizedWhatsapp,
             creator_profile_info: creatorInfo.trim(),
             creator_request_status: "pending_admin",
             creator_request_channel: "whatsapp",
@@ -281,6 +294,7 @@ export default function AuthPage() {
                 WhatsApp
                 <input
                   required
+                  type="tel"
                   value={creatorWhatsapp}
                   onChange={(e) => setCreatorWhatsapp(e.target.value)}
                   style={inputStyle}
