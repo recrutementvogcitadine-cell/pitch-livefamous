@@ -104,6 +104,17 @@ export default function ModerationPage() {
           Suivi des questions escaladées vers modération humaine.
         </p>
 
+        <section style={shortcutCardStyle}>
+          <strong style={{ color: "#0f172a" }}>Raccourcis actions</strong>
+          <div style={shortcutGridStyle}>
+            <Link href="/settings/admin" style={shortcutPrimaryStyle}>Dashboard admin</Link>
+            <Link href="/watch" style={shortcutDarkStyle}>Watch live</Link>
+            <Link href="/lives" style={shortcutDarkStyle}>Tous les lives</Link>
+            <Link href="/api/live-ai/escalations?status=open" style={shortcutDarkStyle}>API escalades ouvertes</Link>
+            <Link href="/api/live-ai/escalations?status=resolved" style={shortcutDarkStyle}>API escalades résolues</Link>
+          </div>
+        </section>
+
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button
             type="button"
@@ -213,6 +224,44 @@ const itemStyle: CSSProperties = {
   padding: 12,
   display: "grid",
   gap: 10,
+};
+
+const shortcutCardStyle: CSSProperties = {
+  border: "1px solid #dbeafe",
+  borderRadius: 12,
+  background: "#f8fafc",
+  padding: 10,
+  display: "grid",
+  gap: 8,
+};
+
+const shortcutGridStyle: CSSProperties = {
+  display: "grid",
+  gap: 8,
+  gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
+};
+
+const shortcutBaseStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: 10,
+  padding: "8px 10px",
+  fontWeight: 700,
+  textDecoration: "none",
+  fontSize: 12,
+};
+
+const shortcutPrimaryStyle: CSSProperties = {
+  ...shortcutBaseStyle,
+  background: "#1d4ed8",
+  color: "#fff",
+};
+
+const shortcutDarkStyle: CSSProperties = {
+  ...shortcutBaseStyle,
+  background: "#0f172a",
+  color: "#fff",
 };
 
 const resolveBtnStyle: CSSProperties = {
