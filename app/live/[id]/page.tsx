@@ -17,7 +17,7 @@ type AgoraUser = {
 type AgoraClient = {
   on: (event: string, handler: (user: AgoraUser, mediaType: string) => Promise<void> | void) => void;
   subscribe: (user: AgoraUser, mediaType: string) => Promise<void>;
-  join: (appId: string, channel: string, token: string | null, uid: null) => Promise<void>;
+  join: (appId: string, channel: string, token: string | null, uid: number | null) => Promise<void>;
   leave: () => Promise<void>;
 };
 
@@ -25,7 +25,7 @@ type AgoraSDK = {
   createClient: (config: { mode: "rtc"; codec: "vp8" | "h264" }) => AgoraClient;
 };
 
-type PageParams = { id?: string } | Promise<{ id?: string }>;
+type PageParams = Promise<{ id?: string }>;
 
 type LiveChatMessage = {
   id: string;
@@ -39,22 +39,59 @@ type LocalHistoryItem = {
   content: string;
 };
 
+type LiveFallbackConfig = {
+  displayName: string;
+  posterSrc: string;
+  videoSrc: string | null;
+};
+
+function getNadiaPosterByVariant(variant: string | null) {
+  if (variant === "2") return "/live-ia-nadia-v2.svg";
+  if (variant === "1") return "/live-ia-nadia.svg";
+  return "/live-ia-nadia-v3.svg";
+}
+
+function getFallbackConfigByLiveId(liveId: string, variant: string | null): LiveFallbackConfig {
+  const normalized = liveId.trim().toLowerCase();
+  if (normalized === "d7a9b66d-3dd9-4b3e-8a1b-f4f6456c1ad6") {
+    return {
+      displayName: "Nadia",
+      posterSrc: getNadiaPosterByVariant(variant),
+      videoSrc: "/akoua-fallback.mp4",
+    };
+  }
+
+  return {
+    displayName: "Assistante IA",
+    posterSrc: "/live-ia-nadia.svg",
+    videoSrc: "/akoua-fallback.mp4",
+  };
+}
+
 function buildLocalAiFallback(input: string) {
   const text = input.trim().toLowerCase();
-  if (!text) return "Je suis Akoua IA ✨ Dis-moi ce que tu veux savoir sur ce live.";
+  if (!text) return "Je suis l'assistante IA du live ✨ Dis-moi ce que tu veux savoir sur ce live.";
   if (text.includes("prix") || text.includes("tarif") || text.includes("coût")) {
-    return "Je suis Akoua IA ✨ Pour les prix/tarifs, je peux te guider selon ton besoin. Donne-moi ton objectif et ton budget.";
+    return "Je suis l'assistante IA du live ✨ Pour les prix/tarifs, je peux te guider selon ton besoin. Donne-moi ton objectif et ton budget.";
   }
   if (text.includes("bonjour") || text.includes("salut") || text.includes("hello")) {
-    return "Je suis Akoua IA ✨ Salut 👋 Je suis là en direct. Pose ta question et je te réponds tout de suite.";
+    return "Je suis l'assistante IA du live ✨ Salut 👋 Je suis là en direct. Pose ta question et je te réponds tout de suite.";
   }
   if (text.includes("live") || text.includes("video") || text.includes("cam")) {
-    return "Je suis Akoua IA ✨ Ce live est en mode chat sans caméra. Écris-moi ce que tu veux et on avance ensemble.";
+    return "Je suis l'assistante IA du live ✨ Ce live est en mode chat sans caméra. Écris-moi ce que tu veux et on avance ensemble.";
   }
-  return "Je suis Akoua IA ✨ Bien reçu. Donne-moi un peu plus de détails et je te réponds de façon claire et rapide.";
+  return "Je suis l'assistante IA du live ✨ Bien reçu. Donne-moi un peu plus de détails et je te réponds de façon claire et rapide.";
+}
+
+function extractWhatsappFromLink(link: string | null) {
+  if (!link) return null;
+  const match = link.match(/wa\.me\/(\d{8,})/i);
+  return match?.[1] ?? null;
 }
 
 export default function LiveViewerPage({ params }: { params: PageParams }) {
+  const AI_NAME = "Assistante IA";
+  const AI_AUTHOR = "@live_ia";
   const [status, setStatus] = useState("Connexion au live...");
   const [resolvedId, setResolvedId] = useState("");
   const [hasVideo, setHasVideo] = useState(false);
@@ -68,6 +105,12 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
   const [chatSending, setChatSending] = useState(false);
   const [aiReplying, setAiReplying] = useState(false);
   const [aiHistory, setAiHistory] = useState<LocalHistoryItem[]>([]);
+  const [fallbackVideoSrc, setFallbackVideoSrc] = useState<string | null>(null);
+  const [fallbackIllustrationSrc, setFallbackIllustrationSrc] = useState<string>("/live-ia-nadia.svg");
+  const [liveDisplayName, setLiveDisplayName] = useState<string>(AI_NAME);
+  const [fallbackVisualOnly, setFallbackVisualOnly] = useState(false);
+  const [creatorWhatsapp, setCreatorWhatsapp] = useState<string | null>(null);
+  const [creatorWhatsappLink, setCreatorWhatsappLink] = useState<string | null>(null);
   const chatInputRef = useRef<HTMLInputElement | null>(null);
   const welcomeSentRef = useRef(false);
   const remoteVideoRef = useRef<HTMLDivElement | null>(null);
@@ -84,6 +127,13 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
     if (!url || !anonKey) return null;
     return createClient(url, anonKey);
   }, []);
+
+  const getNextFallbackVideoSrc = (currentSrc: string | null) => {
+    if (!currentSrc) return null;
+    return null;
+  };
+
+  const displayedWhatsapp = creatorWhatsapp ?? extractWhatsappFromLink(creatorWhatsappLink);
 
   useEffect(() => {
     let active = true;
@@ -105,16 +155,24 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
         cache: "no-store",
       });
       if (tokenResponse.ok) {
-        const body = (await tokenResponse.json()) as { token?: string };
-        return body.token ?? null;
+        const body = (await tokenResponse.json()) as { token?: string; uid?: number; appId?: string };
+        return {
+          token: body.token ?? null,
+          uid: typeof body.uid === "number" && Number.isFinite(body.uid) ? body.uid : null,
+          appId: typeof body.appId === "string" && body.appId.trim() ? body.appId.trim() : null,
+        };
       }
 
       const publisherFallback = await fetch(`/api/agora/token?channel=${encodeURIComponent(channel)}&role=publisher`, {
         cache: "no-store",
       });
-      if (!publisherFallback.ok) return null;
-      const fallbackBody = (await publisherFallback.json()) as { token?: string };
-      return fallbackBody.token ?? null;
+      if (!publisherFallback.ok) return { token: null, uid: null };
+      const fallbackBody = (await publisherFallback.json()) as { token?: string; uid?: number; appId?: string };
+      return {
+        token: fallbackBody.token ?? null,
+        uid: typeof fallbackBody.uid === "number" && Number.isFinite(fallbackBody.uid) ? fallbackBody.uid : null,
+        appId: typeof fallbackBody.appId === "string" && fallbackBody.appId.trim() ? fallbackBody.appId.trim() : null,
+      };
     };
 
     const connectWithCodec = async (channel: string, appId: string, codec: "vp8" | "h264") => {
@@ -146,21 +204,53 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
       });
 
       let token: string | null = null;
+      let joinUid: number | null = null;
+      let joinAppId = appId;
       try {
-        token = await fetchViewerToken(channel);
+        const tokenInfo = await fetchViewerToken(channel);
+        token = tokenInfo.token;
+        joinUid = tokenInfo.uid;
+        if (tokenInfo.appId) joinAppId = tokenInfo.appId;
       } catch {}
 
-      await client.join(appId, channel, token, null);
+      let joined = false;
+      let lastJoinError: unknown = null;
+      const tokenCandidates: Array<string | null> = [];
+      if (token) tokenCandidates.push(token);
+      tokenCandidates.push(null);
+
+      for (const candidate of tokenCandidates) {
+        try {
+          await client.join(joinAppId, channel, candidate, joinUid);
+          joined = true;
+          break;
+        } catch (joinErr) {
+          lastJoinError = joinErr;
+          const joinMessage = String(joinErr ?? "").toLowerCase();
+          const isAuthError = joinMessage.includes("invalid token") || joinMessage.includes("authorized failed") || joinMessage.includes("4096") || joinMessage.includes("4036");
+          if (!isAuthError) throw joinErr;
+        }
+      }
+
+      if (!joined && lastJoinError) {
+        throw lastJoinError;
+      }
     };
 
     const boot = async () => {
       const resolved = await params;
       const liveId = (resolved?.id ?? "").trim();
+      const variant = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("variant") : null;
+      const fallbackConfig = getFallbackConfigByLiveId(liveId, variant);
 
       if (!active) return;
       setResolvedId(liveId);
       setHasVideo(false);
       setVideoUnavailable(false);
+      setLiveDisplayName(fallbackConfig.displayName || AI_NAME);
+      setFallbackIllustrationSrc(fallbackConfig.posterSrc);
+      setFallbackVideoSrc(fallbackConfig.videoSrc);
+      setFallbackVisualOnly(!fallbackConfig.videoSrc);
       const standaloneIOS = isIOSDevice() && isStandaloneMode();
       setIsStandaloneIOS(standaloneIOS);
       setSafariOnlyMode(standaloneIOS);
@@ -214,12 +304,12 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
           setStatus("Connecté. En attente de la vidéo...");
         } else if (active && !connected) {
           setVideoUnavailable(true);
-          setStatus("Mode chat IA actif.");
+          setStatus("Mode chat IA actif (aucun flux vidéo détecté).");
         }
       } catch {
         if (!active) return;
         setVideoUnavailable(true);
-        setStatus("Mode chat IA actif.");
+        setStatus("Mode chat IA actif (aucun flux vidéo détecté).");
       }
     };
 
@@ -284,12 +374,58 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
   }, [resolvedId, supabaseClient]);
 
   useEffect(() => {
+    if (!resolvedId) {
+      setCreatorWhatsapp(null);
+      setCreatorWhatsappLink(null);
+      return;
+    }
+
+    let active = true;
+
+    const loadCreatorWhatsapp = async () => {
+      try {
+        const response = await fetch(`/api/lives/contact?liveId=${encodeURIComponent(resolvedId)}`, {
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          if (active) {
+            setCreatorWhatsapp(null);
+            setCreatorWhatsappLink(null);
+          }
+          return;
+        }
+
+        const body = (await response.json()) as { creatorWhatsapp?: string | null; whatsappLink?: string | null };
+        if (!active) return;
+
+        const whatsapp =
+          typeof body.creatorWhatsapp === "string" && body.creatorWhatsapp.trim() ? body.creatorWhatsapp.trim() : null;
+        const link = typeof body.whatsappLink === "string" && body.whatsappLink.trim() ? body.whatsappLink.trim() : null;
+        setCreatorWhatsapp(whatsapp);
+        setCreatorWhatsappLink(link);
+      } catch {
+        if (active) {
+          setCreatorWhatsapp(null);
+          setCreatorWhatsappLink(null);
+        }
+      }
+    };
+
+    void loadCreatorWhatsapp();
+
+    return () => {
+      active = false;
+    };
+  }, [resolvedId]);
+
+  useEffect(() => {
     if (!resolvedId || welcomeSentRef.current) return;
     welcomeSentRef.current = true;
     const welcomeMessage: LiveChatMessage = {
       id: `welcome-${resolvedId}`,
-      text: "Je suis Akoua IA ✨ Je suis en ligne. Écris-moi et je te réponds tout de suite.",
-      author: "@akoua_ia",
+      text: "Je suis l'assistante IA du live ✨ Je suis en ligne. Écris-moi et je te réponds tout de suite.",
+      author: AI_AUTHOR,
       createdAt: Date.now(),
     };
     setChatMessages((prev) => [...prev, welcomeMessage].slice(-30));
@@ -300,7 +436,7 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
 
     const timer = window.setTimeout(() => {
       setVideoUnavailable(true);
-      setStatus("Mode chat IA actif.");
+      setStatus("Mode chat IA actif (aucun flux vidéo détecté).");
     }, 7000);
 
     return () => {
@@ -438,7 +574,7 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
         const instantMessage: LiveChatMessage = {
           id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
           text: instantText.slice(0, 220),
-          author: "@akoua_ia",
+          author: AI_AUTHOR,
           createdAt: Date.now(),
         };
         setChatMessages((prev) => [...prev, instantMessage].slice(-30));
@@ -450,7 +586,7 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
         const instantMessage: LiveChatMessage = {
           id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
           text: instantText.slice(0, 220),
-          author: "@akoua_ia",
+          author: AI_AUTHOR,
           createdAt: Date.now(),
         };
         setChatMessages((prev) => [...prev, instantMessage].slice(-30));
@@ -462,15 +598,24 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
       const nextHistory: LocalHistoryItem[] = [...aiHistory, userTurn].slice(-12);
 
       try {
-        const replyRes = await fetch("/api/live-ai/reply", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            liveId: effectiveLiveId,
-            message: text,
-            history: nextHistory,
-          }),
-        });
+        const controller = new AbortController();
+        const timeoutId = window.setTimeout(() => controller.abort(), 12000);
+        let replyRes: Response;
+
+        try {
+          replyRes = await fetch("/api/live-ai/reply", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              liveId: effectiveLiveId,
+              message: text,
+              history: nextHistory,
+            }),
+            signal: controller.signal,
+          });
+        } finally {
+          window.clearTimeout(timeoutId);
+        }
 
         const replyBody = (await replyRes.json()) as { reply?: string; error?: string };
         const replyText = (replyBody.reply || "").trim();
@@ -480,7 +625,7 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
         const assistantMessage: LiveChatMessage = {
           id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
           text: finalReplyText.slice(0, 220),
-          author: "@akoua_ia",
+          author: AI_AUTHOR,
           createdAt: Date.now(),
         };
 
@@ -502,7 +647,7 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
         const fallbackMessage: LiveChatMessage = {
           id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
           text: fallbackText.slice(0, 220),
-          author: "@akoua_ia",
+          author: AI_AUTHOR,
           createdAt: Date.now(),
         };
 
@@ -534,10 +679,46 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
         <Link href="/watch" style={{ color: "#93c5fd", textDecoration: "none", fontWeight: 700 }}>
           ← Retour au flux
         </Link>
-        <span style={{ fontSize: 13, opacity: 0.9 }}>{hasVideo ? "EN DIRECT" : "LIVE IA (SANS CAMÉRA)"}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {displayedWhatsapp ? (
+            <span
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                padding: "6px 10px",
+                borderRadius: 999,
+                background: "rgba(15,23,42,0.82)",
+                color: "#86efac",
+                border: "1px solid rgba(255,255,255,0.25)",
+              }}
+              aria-label="Numéro WhatsApp du créateur"
+            >
+              WhatsApp: {displayedWhatsapp}
+            </span>
+          ) : null}
+          {creatorWhatsappLink ? (
+            <a
+              href={creatorWhatsappLink}
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                padding: "6px 10px",
+                borderRadius: 999,
+                textDecoration: "none",
+                background: "#22c55e",
+                color: "#052e16",
+                border: "1px solid rgba(255,255,255,0.25)",
+              }}
+              aria-label="Contacter le créateur sur WhatsApp"
+            >
+              {displayedWhatsapp ? `Écrire ${displayedWhatsapp}` : "Écrire"}
+            </a>
+          ) : null}
+          <span style={{ fontSize: 13, opacity: 0.9 }}>{hasVideo ? "EN DIRECT" : "LIVE IA (SANS CAMÉRA)"}</span>
+        </div>
       </header>
-      <div style={{ padding: "0 14px", color: "#93c5fd", fontSize: 11, opacity: 0.9 }}>live-build: marker-20260227-1</div>
-
       <section className="live-video-shell" style={{ padding: 12 }}>
         <div
           ref={remoteVideoRef}
@@ -551,101 +732,146 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
             position: "relative",
           }}
         >
+          {!hasVideo && fallbackVideoSrc ? (
+            <video
+              key={fallbackVideoSrc ?? "fallback-video"}
+              autoPlay
+              muted
+              loop
+              controls
+              playsInline
+              preload="auto"
+              poster={fallbackIllustrationSrc}
+              src={fallbackVideoSrc}
+              onError={() => {
+                const nextSrc = getNextFallbackVideoSrc(fallbackVideoSrc);
+                if (nextSrc) {
+                  setFallbackVideoSrc(nextSrc);
+                } else {
+                  setFallbackVisualOnly(true);
+                }
+              }}
+              style={{
+                position: "absolute",
+                inset: 0,
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+                opacity: 0.82,
+                background: "#f8fafc",
+              }}
+            />
+          ) : null}
           {!hasVideo ? (
             <div
               style={{
                 position: "absolute",
                 inset: 0,
                 display: "grid",
-                placeItems: "center",
-                textAlign: "center",
-                padding: 18,
-                background: "rgba(2,6,23,0.35)",
+                gridTemplateRows: safariOnlyMode ? "1fr" : "1fr auto",
+                gap: 10,
+                padding: 10,
+                background: "rgba(2,6,23,0.2)",
               }}
             >
+              {!safariOnlyMode && !fallbackVisualOnly ? (
+                <div
+                  style={{
+                    borderRadius: 12,
+                    overflow: "hidden",
+                    border: "1px solid rgba(147,197,253,0.45)",
+                    background: "#020617",
+                  }}
+                >
+                  <video
+                    key={`main-${fallbackVideoSrc ?? "fallback-video"}`}
+                    autoPlay
+                    muted
+                    loop
+                    controls
+                    playsInline
+                    preload="auto"
+                    poster={fallbackIllustrationSrc}
+                    src={fallbackVideoSrc ?? undefined}
+                    onError={() => {
+                      const nextSrc = getNextFallbackVideoSrc(fallbackVideoSrc);
+                      if (nextSrc) {
+                        setFallbackVideoSrc(nextSrc);
+                      } else {
+                        setFallbackVisualOnly(true);
+                      }
+                    }}
+                    style={{ width: "100%", height: "100%", minHeight: 260, objectFit: "cover", display: "block", background: "#f8fafc" }}
+                  />
+                </div>
+              ) : null}
+
+              {!safariOnlyMode && fallbackVisualOnly ? (
+                <div
+                  style={{
+                    minHeight: 260,
+                    borderRadius: 12,
+                    border: "1px solid rgba(147,197,253,0.45)",
+                    background: "#f8fafc",
+                    display: "grid",
+                    placeItems: "center",
+                    textAlign: "center",
+                    padding: 0,
+                    overflow: "hidden",
+                  }}
+                >
+                  <img src={fallbackIllustrationSrc} alt="Illustration live IA" style={{ width: "100%", height: "100%", minHeight: 260, objectFit: "cover", display: "block" }} />
+                </div>
+              ) : null}
+
               <div
                 style={{
-                  maxWidth: 360,
                   border: "1px solid rgba(147,197,253,0.45)",
-                  borderRadius: 14,
-                  padding: "16px 14px",
-                  background: "rgba(2,6,23,0.74)",
-                  backdropFilter: "blur(2px)",
+                  borderRadius: 12,
+                  padding: "12px 12px",
+                  background: "rgba(2,6,23,0.8)",
+                  textAlign: "center",
                 }}
               >
-                <div style={{ display: "grid", placeItems: "center", marginBottom: 10 }}>
-                  <div
+                <strong style={{ color: "#bfdbfe" }}>{liveDisplayName} • Live IA</strong>
+                <p style={{ margin: "8px 0 10px", fontWeight: 700 }}>{status}</p>
+                <p style={{ margin: "0 0 10px", color: "#e2e8f0", fontSize: 13, lineHeight: 1.35 }}>
+                  Ce live fonctionne sans caméra quand aucun flux créateur n'est détecté. Écris en bas pour discuter avec l'IA en direct.
+                </p>
+                {safariOnlyMode ? (
+                  <button
+                    type="button"
+                    onClick={openInSafari}
                     style={{
-                      width: 62,
-                      height: 62,
-                      borderRadius: "50%",
-                      display: "grid",
-                      placeItems: "center",
-                      fontSize: 28,
-                      background: "linear-gradient(135deg, #1d4ed8, #2563eb)",
-                      border: "1px solid rgba(191,219,254,0.7)",
+                      border: "1px solid rgba(255,255,255,0.28)",
+                      borderRadius: 999,
+                      padding: "8px 13px",
+                      background: "rgba(15,23,42,0.8)",
+                      color: "#fff",
+                      fontWeight: 700,
+                      cursor: "pointer",
                     }}
                   >
-                    👩🏾
-                  </div>
-                  <strong style={{ marginTop: 8, color: "#bfdbfe" }}>Akoua • Live IA</strong>
-                </div>
-                <p style={{ margin: "0 0 10px", fontWeight: 700 }}>{status}</p>
-                {!safariOnlyMode ? (
-                  <p style={{ margin: "0 0 12px", color: "#e2e8f0", fontSize: 13, lineHeight: 1.35 }}>
-                    Ce live fonctionne sans caméra. Écris en bas pour discuter avec l'IA en direct.
-                  </p>
-                ) : null}
-                {safariOnlyMode ? (
-                  <div style={{ marginTop: 10 }}>
+                    Ouvrir dans Safari
+                  </button>
+                ) : (
+                  <div style={{ display: "flex", justifyContent: "center", gap: 8, flexWrap: "wrap" }}>
                     <button
                       type="button"
-                      onClick={openInSafari}
+                      onClick={focusChat}
                       style={{
-                        border: "1px solid rgba(255,255,255,0.28)",
+                        border: "1px solid rgba(147,197,253,0.45)",
                         borderRadius: 999,
-                        padding: "8px 13px",
-                        background: "rgba(15,23,42,0.8)",
+                        padding: "9px 14px",
+                        background: "rgba(15,23,42,0.88)",
                         color: "#fff",
                         fontWeight: 700,
                         cursor: "pointer",
                       }}
                     >
-                      Ouvrir dans Safari
+                      Ouvrir le chat IA
                     </button>
                   </div>
-                ) : videoUnavailable ? (
-                  <button
-                    type="button"
-                    onClick={focusChat}
-                    style={{
-                      border: "1px solid rgba(147,197,253,0.45)",
-                      borderRadius: 999,
-                      padding: "9px 14px",
-                      background: "rgba(15,23,42,0.88)",
-                      color: "#fff",
-                      fontWeight: 700,
-                      cursor: "pointer",
-                    }}
-                  >
-                    Ouvrir le chat IA
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={focusChat}
-                    style={{
-                      border: "1px solid rgba(147,197,253,0.45)",
-                      borderRadius: 999,
-                      padding: "9px 14px",
-                      background: "rgba(15,23,42,0.88)",
-                      color: "#fff",
-                      fontWeight: 700,
-                      cursor: "pointer",
-                    }}
-                  >
-                    Ouvrir le chat IA
-                  </button>
                 )}
               </div>
             </div>
@@ -761,7 +987,6 @@ export default function LiveViewerPage({ params }: { params: PageParams }) {
           </button>
           <button
             type="submit"
-            onClick={() => void sendChatMessage()}
             disabled={chatSending || !chatInput.trim()}
             aria-label="Envoyer"
             style={{
