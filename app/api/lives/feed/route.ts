@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { createClient as createUserClient } from "@/lib/supabase/server";
+import { toLiveLifecycleState } from "@/lib/live-states";
 
 const DEFAULT_LIMIT = 8;
 const MAX_LIMIT = 30;
@@ -11,6 +12,10 @@ type LiveRow = {
   status: string | null;
   created_at: string | null;
   creator_id: string | null;
+  creator_whatsapp?: string | null;
+  creator_verified?: boolean | null;
+  creator_is_certified?: boolean | null;
+  is_certified?: boolean | null;
 };
 
 function normalizeWhatsapp(value: unknown) {
@@ -22,12 +27,7 @@ function normalizeWhatsapp(value: unknown) {
 }
 
 function pickCreatorWhatsapp(metadata: Record<string, unknown>) {
-  return (
-    normalizeWhatsapp(metadata.creator_whatsapp) ??
-    normalizeWhatsapp(metadata.whatsapp) ??
-    normalizeWhatsapp(metadata.phone) ??
-    normalizeWhatsapp(metadata.phone_number)
-  );
+  return normalizeWhatsapp(metadata.creator_whatsapp);
 }
 
 async function getAuthenticatedUser(req: Request) {
@@ -74,13 +74,6 @@ async function getAuthenticatedUser(req: Request) {
 
 export async function GET(req: Request) {
   try {
-    const { user, error: authError } = await getAuthenticatedUser(req);
-
-    if (!user) {
-      const status = authError === "supabase anon env missing" ? 500 : 401;
-      return NextResponse.json({ error: authError ?? "unauthorized" }, { status });
-    }
-
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -104,23 +97,42 @@ export async function GET(req: Request) {
       },
     });
 
-    let query = adminClient
-      .from("lives")
-      .select("id, title, status, created_at, creator_id")
+    let rows: LiveRow[] = [];
+
+    const liveStreamsSelect =
+      "id, title, status, created_at, creator_id, creator_whatsapp, creator_verified, creator_is_certified, is_certified";
+
+    let liveStreamsQuery = adminClient
+      .from("live_streams")
+      .select(liveStreamsSelect)
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);
 
     if (liveOnly) {
-      query = query.eq("status", "live");
+      liveStreamsQuery = liveStreamsQuery.in("status", ["live", "active"]);
     }
 
-    const { data, error } = await query;
+    const liveStreamsResult = await liveStreamsQuery;
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    if (!liveStreamsResult.error) {
+      rows = (liveStreamsResult.data ?? []) as LiveRow[];
+    } else {
+      let legacyQuery = adminClient
+        .from("lives")
+        .select("id, title, status, created_at, creator_id")
+        .order("created_at", { ascending: false })
+        .range(offset, offset + limit - 1);
+
+      if (liveOnly) {
+        legacyQuery = legacyQuery.in("status", ["live", "active"]);
+      }
+
+      const legacyResult = await legacyQuery;
+      if (legacyResult.error) {
+        return NextResponse.json({ error: legacyResult.error.message }, { status: 500 });
+      }
+      rows = (legacyResult.data ?? []) as LiveRow[];
     }
-
-    const rows = (data ?? []) as LiveRow[];
     const creatorIds = Array.from(new Set(rows.map((item) => item.creator_id).filter((id): id is string => Boolean(id))));
 
     const whatsappByCreator: Record<string, string | null> = {};
@@ -141,7 +153,12 @@ export async function GET(req: Request) {
 
     const enrichedRows = rows.map((row) => ({
       ...row,
-      creator_whatsapp: row.creator_id ? whatsappByCreator[row.creator_id] ?? null : null,
+      lifecycleState: toLiveLifecycleState(row.status),
+      creator_whatsapp:
+        row.creator_whatsapp ?? (row.creator_id ? whatsappByCreator[row.creator_id] ?? null : null),
+      creator_verified: row.creator_verified ?? null,
+      creator_is_certified: row.creator_is_certified ?? null,
+      is_certified: row.is_certified ?? null,
     }));
 
     return NextResponse.json({ rows: enrichedRows, liveOnly }, { status: 200 });
