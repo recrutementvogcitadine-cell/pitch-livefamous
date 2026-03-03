@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent, type UIEvent } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent, type UIEvent } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { useAppLogo } from "../components/app-logo";
 import LiveNotificationControls from "../components/LiveNotificationControls";
@@ -10,12 +10,22 @@ type LiveRow = {
   id: string;
   title: string | null;
   status: string | null;
+  lifecycleState?: "LIVE_ACTIVE" | "LIVE_SCHEDULED" | "LIVE_ENDED";
   created_at: string | null;
   creator_id: string | null;
   creator_whatsapp?: string | null;
   creator_verified?: boolean | null;
   creator_is_certified?: boolean | null;
   is_certified?: boolean | null;
+};
+
+type DiscoveryFallbackItem = {
+  isLive?: boolean;
+  liveId?: string | null;
+  liveTitle?: string | null;
+  liveStartedAt?: string | null;
+  creatorId?: string;
+  creatorCertifiedBlue?: boolean;
 };
 
 type LiveAiMessage = {
@@ -37,7 +47,23 @@ type WatchButtonLabels = {
   becomeCreatorLabel: string;
 };
 
+type CreatorAccessState = {
+  isAuthenticated: boolean;
+  isValidatedCreator: boolean;
+  accountType: string;
+  creatorRequestStatus: string;
+  creatorRole: string;
+  shouldRedirectToCreatorForm: boolean;
+  launchHref: string;
+  creatorFormHref: string;
+};
+
+type PlatformStatsResponse = {
+  source?: "connected" | "degraded" | "disconnected";
+};
+
 const PAGE_SIZE = 8;
+const BUILD_ID = process.env.NEXT_PUBLIC_BUILD_ID ?? "dev";
 
 export default function WatchPage() {
   const startLiveId =
@@ -70,6 +96,17 @@ export default function WatchPage() {
     goLiveCreatorLabel: "Passer en live (créateur)",
     becomeCreatorLabel: "Devenir créateur",
   });
+  const [creatorAccess, setCreatorAccess] = useState<CreatorAccessState>({
+    isAuthenticated: false,
+    isValidatedCreator: false,
+    accountType: "spectator",
+    creatorRequestStatus: "none",
+    creatorRole: "none",
+    shouldRedirectToCreatorForm: true,
+    launchHref: "/settings",
+    creatorFormHref: "/auth?mode=creator",
+  });
+  const [platformSource, setPlatformSource] = useState<"connected" | "degraded" | "disconnected">("disconnected");
   const previewVideoRef = useRef<HTMLVideoElement | null>(null);
   const appLogo = useAppLogo();
   const followedLivesCount = useMemo(
@@ -89,25 +126,50 @@ export default function WatchPage() {
     return createClient(url, key);
   }, []);
 
-  const loadLives = async (nextOffset: number, append: boolean) => {
-    const authHeaders = await getAuthHeaders();
+  const loadLives = useCallback(async (nextOffset: number, append: boolean) => {
     const response = await fetch(
-      `/api/lives/feed?offset=${encodeURIComponent(String(nextOffset))}&limit=${encodeURIComponent(String(PAGE_SIZE))}`,
-      { cache: "no-store", headers: authHeaders }
+      `/api/lives/feed?offset=${encodeURIComponent(String(nextOffset))}&limit=${encodeURIComponent(String(PAGE_SIZE))}&liveOnly=true&v=${encodeURIComponent(BUILD_ID)}`,
+      { cache: "no-store" }
     );
 
-    if (response.status === 401) {
-      window.location.href = "/auth";
-      return;
+    let rows: LiveRow[] = [];
+    if (response.ok) {
+      const body = (await response.json()) as { rows?: LiveRow[] };
+      rows = Array.isArray(body.rows) ? body.rows : [];
     }
 
-    const body = (await response.json()) as { rows?: LiveRow[]; error?: string };
-
-    if (!response.ok) {
-      throw new Error(body.error ?? "live feed fetch failed");
+    if (rows.length === 0 && nextOffset === 0) {
+      try {
+        const fallbackResponse = await fetch(
+          `/api/lives/discovery?limit=${encodeURIComponent(String(PAGE_SIZE))}&v=${encodeURIComponent(BUILD_ID)}`,
+          {
+            cache: "no-store",
+          }
+        );
+        if (fallbackResponse.ok) {
+          const fallbackBody = (await fallbackResponse.json()) as { feed?: DiscoveryFallbackItem[] };
+          const fallbackFeed = Array.isArray(fallbackBody.feed) ? fallbackBody.feed : [];
+          rows = fallbackFeed
+            .filter((item): item is DiscoveryFallbackItem & { liveId: string } => Boolean(item.isLive && item.liveId))
+            .map((item) => ({
+              id: item.liveId,
+              title: item.liveTitle ?? "Live en direct",
+              status: "live",
+              created_at: item.liveStartedAt ?? null,
+              creator_id: item.creatorId ?? null,
+              creator_verified: item.creatorCertifiedBlue ?? false,
+              creator_is_certified: item.creatorCertifiedBlue ?? false,
+              is_certified: item.creatorCertifiedBlue ?? false,
+              lifecycleState: "LIVE_ACTIVE",
+            }));
+        }
+      } catch {}
     }
 
-    const rows = Array.isArray(body.rows) ? body.rows : [];
+    if (!response.ok && rows.length === 0) {
+      throw new Error("live feed fetch failed");
+    }
+
     const orderedRows =
       !append && startLiveId
         ? (() => {
@@ -120,7 +182,7 @@ export default function WatchPage() {
     setLives((prev) => (append ? [...prev, ...orderedRows] : orderedRows));
     setOffset(nextOffset + rows.length);
     setHasMore(rows.length === PAGE_SIZE);
-  };
+  }, [startLiveId]);
 
   useEffect(() => {
     const init = async () => {
@@ -137,8 +199,34 @@ export default function WatchPage() {
     };
 
     void init();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [loadLives]);
+
+  useEffect(() => {
+    if (!client) return;
+
+    const channel = client
+      .channel("watch-lives-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "live_streams" },
+        () => {
+          void loadLives(0, false);
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "lives" },
+        () => {
+          void loadLives(0, false);
+        }
+      );
+
+    channel.subscribe();
+
+    return () => {
+      void client.removeChannel(channel);
+    };
+  }, [client, loadLives]);
 
   useEffect(() => {
     if (!client) return;
@@ -202,6 +290,63 @@ export default function WatchPage() {
 
     void loadButtonLabels();
   }, []);
+
+  useEffect(() => {
+    const loadCreatorAccess = async () => {
+      try {
+        const authHeaders = await getAuthHeaders();
+        const response = await fetch("/api/creator/access", { cache: "no-store", headers: authHeaders });
+        if (!response.ok) return;
+        const body = (await response.json()) as Partial<CreatorAccessState>;
+        setCreatorAccess((prev) => ({
+          ...prev,
+          isAuthenticated: Boolean(body.isAuthenticated),
+          isValidatedCreator: Boolean(body.isValidatedCreator),
+          accountType: typeof body.accountType === "string" ? body.accountType : prev.accountType,
+          creatorRequestStatus:
+            typeof body.creatorRequestStatus === "string" ? body.creatorRequestStatus : prev.creatorRequestStatus,
+          creatorRole: typeof body.creatorRole === "string" ? body.creatorRole : prev.creatorRole,
+          shouldRedirectToCreatorForm: Boolean(body.shouldRedirectToCreatorForm),
+          launchHref: typeof body.launchHref === "string" && body.launchHref.trim() ? body.launchHref : prev.launchHref,
+          creatorFormHref:
+            typeof body.creatorFormHref === "string" && body.creatorFormHref.trim()
+              ? body.creatorFormHref
+              : prev.creatorFormHref,
+        }));
+      } catch {}
+    };
+
+    void loadCreatorAccess();
+  }, []);
+
+  const loadPlatformStatus = useCallback(async () => {
+    try {
+      const response = await fetch("/api/lives/platform-stats", { cache: "no-store" });
+      if (!response.ok) {
+        setPlatformSource("disconnected");
+        return;
+      }
+
+      const body = (await response.json()) as PlatformStatsResponse;
+      const source = body.source;
+      if (source === "connected" || source === "degraded" || source === "disconnected") {
+        setPlatformSource(source);
+      } else {
+        setPlatformSource("disconnected");
+      }
+    } catch {
+      setPlatformSource("disconnected");
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadPlatformStatus();
+    const interval = setInterval(() => {
+      void loadPlatformStatus();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [loadPlatformStatus]);
 
   useEffect(() => {
     if (!previewVideoRef.current || !previewStream) return;
@@ -549,6 +694,37 @@ export default function WatchPage() {
     }
   };
 
+  const cameraActionHref = creatorAccess.isValidatedCreator ? creatorAccess.launchHref : creatorAccess.creatorFormHref;
+  const cameraActionLabel = creatorAccess.isValidatedCreator ? buttonLabels.goLiveLabel : buttonLabels.becomeCreatorLabel;
+  const cameraCreatorLabel = creatorAccess.isValidatedCreator ? buttonLabels.goLiveCreatorLabel : buttonLabels.becomeCreatorLabel;
+  const humanLives = useMemo(() => lives.filter((live) => !isAiLive(live)), [lives]);
+  const aiLives = useMemo(() => lives.filter((live) => isAiLive(live)), [lives]);
+  const separatedLives = useMemo(() => [...humanLives, ...aiLives], [humanLives, aiLives]);
+  const platformStatusLabel =
+    platformSource === "connected"
+      ? "🟢 Connecté à la base"
+      : platformSource === "degraded"
+        ? "🟡 Mode dégradé"
+        : "🔵 Mode démo";
+  const platformStatusTheme =
+    platformSource === "connected"
+      ? {
+          borderColor: "rgba(34,197,94,0.45)",
+          background: "rgba(22,101,52,0.45)",
+          color: "#dcfce7",
+        }
+      : platformSource === "degraded"
+        ? {
+            borderColor: "rgba(234,179,8,0.45)",
+            background: "rgba(133,77,14,0.45)",
+            color: "#fef9c3",
+          }
+        : {
+            borderColor: "rgba(59,130,246,0.45)",
+            background: "rgba(30,64,175,0.45)",
+            color: "#dbeafe",
+          };
+
   if (loading) {
     return <main style={centerStyle}>Chargement du flux live…</main>;
   }
@@ -586,6 +762,9 @@ export default function WatchPage() {
         </svg>
         <span style={srOnlyStyle}>Accueil</span>
       </Link>
+      <div style={{ ...footerConnectionStyle, ...platformStatusTheme }} aria-live="polite">
+        {platformStatusLabel}
+      </div>
 
       <div
         style={{
@@ -596,12 +775,24 @@ export default function WatchPage() {
         }}
         onScroll={onReachEnd}
       >
+        <div style={{ ...connectionBannerStyle, ...platformStatusTheme }}>{platformStatusLabel} • statut plateforme</div>
         {followedLivesCount > 0 ? (
           <div style={followedLivesBannerStyle}>
             🔔 {followedLivesCount} live{followedLivesCount > 1 ? "s" : ""} de créateur{followedLivesCount > 1 ? "s" : ""} suivi{followedLivesCount > 1 ? "s" : ""} en ce moment
           </div>
         ) : null}
-        {lives.map((live) => (
+        {separatedLives.map((live, index) => (
+          <Fragment key={live.id}>
+          {index === 0 && humanLives.length > 0 ? (
+            <section style={feedLabelSlideStyle}>
+              <div style={feedLabelStyle}>Lives humains</div>
+            </section>
+          ) : null}
+          {index === humanLives.length && aiLives.length > 0 ? (
+            <section style={feedLabelSlideStyle}>
+              <div style={feedLabelStyle}>Lives IA</div>
+            </section>
+          ) : null}
           <section
             key={live.id}
             style={{ ...slideStyle, cursor: live.creator_id !== currentUserId ? "pointer" : "default" }}
@@ -612,6 +803,19 @@ export default function WatchPage() {
                 🤖
                 <span style={actionTextStyle}>AI Live</span>
               </button>
+              {live.creator_id && live.creator_id !== currentUserId ? (
+                <Link href={cameraActionHref} style={cameraRailLinkStyle} aria-label={cameraActionLabel}>
+                  <span style={cameraFeedIconStyle} aria-hidden="true">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                      <rect x="3.5" y="6" width="13" height="12" rx="2.8" fill="white" />
+                      <path d="M16.5 10L21 8V16L16.5 14V10Z" fill="white" />
+                      <circle cx="10" cy="12" r="3.4" fill="#dc2626" />
+                      <circle cx="10" cy="12" r="1.4" fill="white" />
+                    </svg>
+                  </span>
+                  <span style={actionTextStyle}>{creatorAccess.isValidatedCreator ? "Live" : "Caméra"}</span>
+                </Link>
+              ) : null}
             </aside>
 
             <div style={overlayStyle}>
@@ -623,11 +827,6 @@ export default function WatchPage() {
                   height={38}
                   style={{ borderRadius: 10, border: "1px solid rgba(255,255,255,0.3)", background: "#fff" }}
                 />
-                <span style={badgeStyle}>EN DIRECT</span>
-                <span style={aiBadgeStyle}>Créateur virtuel IA</span>
-                {live.creator_id && currentUserId && live.creator_id !== currentUserId && followingByCreator[live.creator_id] ? (
-                  <span style={followedCreatorBadgeStyle}>Créateur suivi</span>
-                ) : null}
                 {live.creator_id && live.creator_id !== currentUserId ? (
                   <button
                     type="button"
@@ -689,18 +888,16 @@ export default function WatchPage() {
                           ? "Masquer ma caméra"
                           : "Afficher ma caméra"}
                     </button>
-                    <Link href="/auth?mode=creator" style={goLiveActionStyle}>
-                      <span style={newBadgeStyle}>NOUVEAU</span>
+                    <Link href={cameraActionHref} style={goLiveActionStyle}>
                       <span style={cameraIconBadgeStyle} aria-hidden="true">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                          <path
-                            d="M4 8.5C4 7.12 5.12 6 6.5 6H13.5C14.88 6 16 7.12 16 8.5V15.5C16 16.88 14.88 18 13.5 18H6.5C5.12 18 4 16.88 4 15.5V8.5Z"
-                            fill="#ef4444"
-                          />
-                          <path d="M16 10.2L20 8V16L16 13.8V10.2Z" fill="#ef4444" />
+                          <rect x="3.5" y="6" width="13" height="12" rx="2.8" fill="white" />
+                          <path d="M16.5 10L21 8V16L16.5 14V10Z" fill="white" />
+                          <circle cx="10" cy="12" r="3.4" fill="#dc2626" />
+                          <circle cx="10" cy="12" r="1.4" fill="white" />
                         </svg>
                       </span>
-                      <span style={goLiveLabelStyle}>{buttonLabels.goLiveLabel}</span>
+                      <span style={goLiveLabelStyle}>{cameraActionLabel}</span>
                     </Link>
                   </>
                 ) : null}
@@ -777,6 +974,7 @@ export default function WatchPage() {
             ) : null}
 
           </section>
+          </Fragment>
         ))}
 
         {!hasMore ? (
@@ -797,18 +995,16 @@ export default function WatchPage() {
           <video ref={previewVideoRef} autoPlay playsInline muted style={cameraVideoStyle} />
           {previewError ? <p style={{ margin: 0, color: "#fecaca", fontSize: 12 }}>Erreur caméra: {previewError}</p> : null}
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <Link href="/auth?mode=creator" style={goLiveActionStyle}>
-              <span style={newBadgeStyle}>NOUVEAU</span>
+            <Link href={cameraActionHref} style={goLiveActionStyle}>
               <span style={cameraIconBadgeStyle} aria-hidden="true">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                  <path
-                    d="M4 8.5C4 7.12 5.12 6 6.5 6H13.5C14.88 6 16 7.12 16 8.5V15.5C16 16.88 14.88 18 13.5 18H6.5C5.12 18 4 16.88 4 15.5V8.5Z"
-                    fill="#ef4444"
-                  />
-                  <path d="M16 10.2L20 8V16L16 13.8V10.2Z" fill="#ef4444" />
+                  <rect x="3.5" y="6" width="13" height="12" rx="2.8" fill="white" />
+                  <path d="M16.5 10L21 8V16L16.5 14V10Z" fill="white" />
+                  <circle cx="10" cy="12" r="3.4" fill="#dc2626" />
+                  <circle cx="10" cy="12" r="1.4" fill="white" />
                 </svg>
               </span>
-              <span style={goLiveLabelStyle}>{buttonLabels.goLiveCreatorLabel}</span>
+              <span style={goLiveLabelStyle}>{cameraCreatorLabel}</span>
             </Link>
           </div>
         </section>
@@ -841,6 +1037,26 @@ const slideStyle: CSSProperties = {
   color: "#fff",
 };
 
+const feedLabelSlideStyle: CSSProperties = {
+  minHeight: 84,
+  scrollSnapAlign: "start",
+  display: "grid",
+  placeItems: "center",
+  background: "#020617",
+  padding: 12,
+};
+
+const feedLabelStyle: CSSProperties = {
+  borderRadius: 999,
+  border: "1px solid rgba(148,163,184,0.45)",
+  background: "rgba(15,23,42,0.85)",
+  color: "#e2e8f0",
+  padding: "8px 14px",
+  fontSize: 13,
+  fontWeight: 800,
+  letterSpacing: 0.2,
+};
+
 const overlayStyle: CSSProperties = {
   width: "100%",
   maxWidth: 560,
@@ -850,26 +1066,6 @@ const overlayStyle: CSSProperties = {
   backdropFilter: "blur(4px)",
 };
 
-const badgeStyle: CSSProperties = {
-  display: "inline-block",
-  borderRadius: 999,
-  background: "#dc2626",
-  color: "#fff",
-  padding: "4px 10px",
-  fontSize: 12,
-  fontWeight: 700,
-};
-
-const aiBadgeStyle: CSSProperties = {
-  display: "inline-block",
-  borderRadius: 999,
-  background: "#2563eb",
-  color: "#fff",
-  padding: "4px 10px",
-  fontSize: 12,
-  fontWeight: 700,
-  marginLeft: 8,
-};
 
 const verifiedBadgeStyle: CSSProperties = {
   display: "inline-flex",
@@ -907,12 +1103,13 @@ const goLiveActionStyle: CSSProperties = {
 const cameraIconBadgeStyle: CSSProperties = {
   width: 24,
   height: 24,
-  borderRadius: 999,
+  borderRadius: 8,
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
-  background: "rgba(255,255,255,0.92)",
-  boxShadow: "0 3px 8px rgba(127,29,29,0.25)",
+  background: "#dc2626",
+  border: "1px solid rgba(255,255,255,0.28)",
+  boxShadow: "0 6px 12px rgba(127,29,29,0.35)",
 };
 
 const goLiveLabelStyle: CSSProperties = {
@@ -920,19 +1117,6 @@ const goLiveLabelStyle: CSSProperties = {
   fontWeight: 800,
 };
 
-const newBadgeStyle: CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  borderRadius: 999,
-  padding: "3px 7px",
-  background: "#ef4444",
-  color: "#fff",
-  fontSize: 10,
-  fontWeight: 900,
-  letterSpacing: 0.3,
-  boxShadow: "0 3px 8px rgba(127,29,29,0.35)",
-};
 
 const inlineActionButtonStyle: CSSProperties = {
   border: "1px solid rgba(255,255,255,0.35)",
@@ -1003,6 +1187,33 @@ const actionBtnStyle: CSSProperties = {
   cursor: "pointer",
 };
 
+const cameraRailLinkStyle: CSSProperties = {
+  width: 64,
+  minHeight: 64,
+  borderRadius: 999,
+  border: "1px solid rgba(255,255,255,0.25)",
+  background: "rgba(15, 23, 42, 0.7)",
+  color: "#fff",
+  display: "inline-flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 4,
+  textDecoration: "none",
+};
+
+const cameraFeedIconStyle: CSSProperties = {
+  width: 40,
+  height: 40,
+  borderRadius: 12,
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  background: "#dc2626",
+  border: "1px solid rgba(255,255,255,0.28)",
+  boxShadow: "0 8px 18px rgba(220,38,38,0.45)",
+};
+
 const actionTextStyle: CSSProperties = {
   fontSize: 11,
   fontWeight: 700,
@@ -1026,15 +1237,34 @@ const followedLivesBannerStyle: CSSProperties = {
   backdropFilter: "blur(4px)",
 };
 
-const followedCreatorBadgeStyle: CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 6,
+const connectionBannerStyle: CSSProperties = {
+  position: "sticky",
+  top: 10,
+  zIndex: 108,
+  margin: "0 auto 8px",
+  width: "fit-content",
+  maxWidth: "calc(100% - 24px)",
   borderRadius: 999,
-  padding: "5px 10px",
-  background: "rgba(56,189,248,0.22)",
-  border: "1px solid rgba(56,189,248,0.5)",
-  color: "#e0f2fe",
+  border: "1px solid rgba(148,163,184,0.35)",
+  background: "rgba(15,23,42,0.88)",
+  color: "#e2e8f0",
+  padding: "6px 12px",
+  fontSize: 12,
+  fontWeight: 700,
+  letterSpacing: 0.2,
+  textAlign: "center",
+};
+
+const footerConnectionStyle: CSSProperties = {
+  position: "fixed",
+  left: 12,
+  bottom: 12,
+  zIndex: 120,
+  borderRadius: 999,
+  border: "1px solid rgba(148,163,184,0.3)",
+  background: "rgba(2,6,23,0.86)",
+  color: "#cbd5e1",
+  padding: "6px 10px",
   fontSize: 11,
   fontWeight: 700,
 };
@@ -1201,6 +1431,11 @@ const cameraCloseButtonStyle: CSSProperties = {
 
 function isCreatorCertified(live: LiveRow) {
   return Boolean(live.creator_verified || live.creator_is_certified || live.is_certified);
+}
+
+function isAiLive(live: LiveRow) {
+  const title = (live.title ?? "").trim().toLowerCase();
+  return title.includes("live ia") || title.includes("assistante ia") || title.includes("influenceuse ia");
 }
 
 function toDisplayErrorMessage(err: unknown): string {
