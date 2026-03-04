@@ -1,6 +1,11 @@
-import Image from "next/image";
+import { redirect } from "next/navigation";
+
+export default function Page() {
+  redirect("/famous-ai");
+}import Image from "next/image";
 import Link from "next/link";
 import LiveHeroStats from "./components/LiveHeroStats";
+import CreatorProfileForm from "./components/CreatorProfileForm";
 
 export default function HomePage() {
   const supabaseConfigured = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
@@ -148,6 +153,8 @@ export default function HomePage() {
         </div>
 
         <LiveHeroStats />
+
+        <CreatorProfileForm />
 
         {!supabaseConfigured ? (
           <div
